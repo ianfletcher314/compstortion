@@ -1,15 +1,91 @@
 // Pedal state
 const state = {
-  comp1: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5 },
+  comp1: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5 },
   distortion: { active: false, drive: 0.5, tone: 0.5, level: 0.5 },
-  comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5 },
+  comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5 },
   audioStarted: false,
   audioContext: null,
+  nodes: null,
 };
 
 // DOM Elements
 const startButton = document.getElementById('start-audio');
 const inputSelect = document.getElementById('input-select');
+
+// Audio node references
+let audioNodes = {
+  source: null,
+  // Comp 1
+  comp1Input: null,
+  comp1Compressor: null,
+  comp1Gain: null,
+  comp1Bypass: null,
+  comp1Output: null,
+  // Distortion
+  distInput: null,
+  distPreGain: null,
+  distWaveshaper: null,
+  distToneFilter: null,
+  distPostGain: null,
+  distBypass: null,
+  distOutput: null,
+  // Comp 2
+  comp2Input: null,
+  comp2Compressor: null,
+  comp2Gain: null,
+  comp2Bypass: null,
+  comp2Output: null,
+};
+
+// Parameter mapping functions
+function mapThreshold(value) {
+  // 0-1 -> -60 to -10 dB
+  return -60 + (value * 50);
+}
+
+function mapRatio(value) {
+  // 0-1 -> 1:1 to 20:1
+  return 1 + (value * 19);
+}
+
+function mapAttack(value) {
+  // 0-1 -> 0.001 to 0.1 seconds
+  return 0.001 + (value * 0.099);
+}
+
+function mapRelease(value) {
+  // 0-1 -> 0.01 to 1 seconds
+  return 0.01 + (value * 0.99);
+}
+
+function mapLevel(value) {
+  // 0-1 -> 0 to 2 (with 0.5 = unity gain)
+  return value * 2;
+}
+
+function mapDrive(value) {
+  // 0-1 -> 1 to 50 (pre-gain multiplier)
+  return 1 + (value * 49);
+}
+
+function mapTone(value) {
+  // 0-1 -> 200Hz to 8000Hz
+  return 200 + (value * 7800);
+}
+
+// Create distortion curve for waveshaper
+function makeDistortionCurve(amount) {
+  const samples = 44100;
+  const curve = new Float32Array(samples);
+  const deg = Math.PI / 180;
+  const k = amount * 100;
+
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1;
+    curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
 
 // Initialize knob rotations from state
 function initKnobs() {
@@ -26,6 +102,64 @@ function updateKnobRotation(knob, value) {
   const rotation = (value * 270) - 135;
   const inner = knob.querySelector('.knob-inner');
   inner.style.transform = `rotate(${rotation}deg)`;
+}
+
+// Update audio parameters based on current state
+function updateAudioParams(pedal, param) {
+  if (!state.audioContext || !audioNodes.comp1Compressor) return;
+
+  const value = state[pedal][param];
+
+  if (pedal === 'comp1') {
+    switch (param) {
+      case 'threshold':
+        audioNodes.comp1Compressor.threshold.setValueAtTime(mapThreshold(value), state.audioContext.currentTime);
+        break;
+      case 'ratio':
+        audioNodes.comp1Compressor.ratio.setValueAtTime(mapRatio(value), state.audioContext.currentTime);
+        break;
+      case 'attack':
+        audioNodes.comp1Compressor.attack.setValueAtTime(mapAttack(value), state.audioContext.currentTime);
+        break;
+      case 'release':
+        audioNodes.comp1Compressor.release.setValueAtTime(mapRelease(value), state.audioContext.currentTime);
+        break;
+      case 'level':
+        audioNodes.comp1Gain.gain.setValueAtTime(mapLevel(value), state.audioContext.currentTime);
+        break;
+    }
+  } else if (pedal === 'distortion') {
+    switch (param) {
+      case 'drive':
+        audioNodes.distPreGain.gain.setValueAtTime(mapDrive(value), state.audioContext.currentTime);
+        audioNodes.distWaveshaper.curve = makeDistortionCurve(value);
+        break;
+      case 'tone':
+        audioNodes.distToneFilter.frequency.setValueAtTime(mapTone(value), state.audioContext.currentTime);
+        break;
+      case 'level':
+        audioNodes.distPostGain.gain.setValueAtTime(mapLevel(value), state.audioContext.currentTime);
+        break;
+    }
+  } else if (pedal === 'comp2') {
+    switch (param) {
+      case 'threshold':
+        audioNodes.comp2Compressor.threshold.setValueAtTime(mapThreshold(value), state.audioContext.currentTime);
+        break;
+      case 'ratio':
+        audioNodes.comp2Compressor.ratio.setValueAtTime(mapRatio(value), state.audioContext.currentTime);
+        break;
+      case 'attack':
+        audioNodes.comp2Compressor.attack.setValueAtTime(mapAttack(value), state.audioContext.currentTime);
+        break;
+      case 'release':
+        audioNodes.comp2Compressor.release.setValueAtTime(mapRelease(value), state.audioContext.currentTime);
+        break;
+      case 'level':
+        audioNodes.comp2Gain.gain.setValueAtTime(mapLevel(value), state.audioContext.currentTime);
+        break;
+    }
+  }
 }
 
 // Handle knob dragging
@@ -58,8 +192,7 @@ function setupKnobInteraction() {
       const param = knob.dataset.param;
       state[pedal][param] = newValue;
       updateKnobRotation(knob, newValue);
-
-      // TODO: Update audio parameters when audio engine is implemented
+      updateAudioParams(pedal, param);
     };
 
     const onMouseUp = () => {
@@ -78,6 +211,41 @@ function setupKnobInteraction() {
   });
 }
 
+// Update bypass routing for a pedal
+function updateBypass(pedalId) {
+  if (!state.audioContext) return;
+
+  const isActive = state[pedalId].active;
+
+  if (pedalId === 'comp1') {
+    if (isActive) {
+      // Enable effect: mute bypass, unmute effect chain
+      audioNodes.comp1Bypass.gain.setValueAtTime(0, state.audioContext.currentTime);
+      audioNodes.comp1Gain.gain.setValueAtTime(mapLevel(state.comp1.level), state.audioContext.currentTime);
+    } else {
+      // Bypass: mute effect chain, unmute bypass
+      audioNodes.comp1Bypass.gain.setValueAtTime(1, state.audioContext.currentTime);
+      audioNodes.comp1Gain.gain.setValueAtTime(0, state.audioContext.currentTime);
+    }
+  } else if (pedalId === 'distortion') {
+    if (isActive) {
+      audioNodes.distBypass.gain.setValueAtTime(0, state.audioContext.currentTime);
+      audioNodes.distPostGain.gain.setValueAtTime(mapLevel(state.distortion.level), state.audioContext.currentTime);
+    } else {
+      audioNodes.distBypass.gain.setValueAtTime(1, state.audioContext.currentTime);
+      audioNodes.distPostGain.gain.setValueAtTime(0, state.audioContext.currentTime);
+    }
+  } else if (pedalId === 'comp2') {
+    if (isActive) {
+      audioNodes.comp2Bypass.gain.setValueAtTime(0, state.audioContext.currentTime);
+      audioNodes.comp2Gain.gain.setValueAtTime(mapLevel(state.comp2.level), state.audioContext.currentTime);
+    } else {
+      audioNodes.comp2Bypass.gain.setValueAtTime(1, state.audioContext.currentTime);
+      audioNodes.comp2Gain.gain.setValueAtTime(0, state.audioContext.currentTime);
+    }
+  }
+}
+
 // Toggle pedal on/off
 function togglePedal(pedalId) {
   state[pedalId].active = !state[pedalId].active;
@@ -89,7 +257,7 @@ function togglePedal(pedalId) {
     led.classList.remove('active');
   }
 
-  // TODO: Update audio routing when audio engine is implemented
+  updateBypass(pedalId);
   console.log(`${pedalId} is now ${state[pedalId].active ? 'ON' : 'OFF'}`);
 }
 
@@ -159,13 +327,108 @@ async function populateInputDevices() {
   }
 }
 
-// Start audio (placeholder for Phase 2)
+// Create the audio processing chain
+function createAudioChain(ctx, source) {
+  // === COMPRESSOR 1 ===
+  audioNodes.comp1Input = ctx.createGain();
+  audioNodes.comp1Compressor = ctx.createDynamicsCompressor();
+  audioNodes.comp1Gain = ctx.createGain();
+  audioNodes.comp1Bypass = ctx.createGain();
+  audioNodes.comp1Output = ctx.createGain();
+
+  // Set initial compressor params
+  audioNodes.comp1Compressor.threshold.value = mapThreshold(state.comp1.threshold);
+  audioNodes.comp1Compressor.ratio.value = mapRatio(state.comp1.ratio);
+  audioNodes.comp1Compressor.attack.value = mapAttack(state.comp1.attack);
+  audioNodes.comp1Compressor.release.value = mapRelease(state.comp1.release);
+  audioNodes.comp1Compressor.knee.value = 6;
+
+  // Initial bypass state (bypassed by default)
+  audioNodes.comp1Gain.gain.value = 0;
+  audioNodes.comp1Bypass.gain.value = 1;
+
+  // Connect comp1: input -> [compressor -> gain] + [bypass] -> output
+  source.connect(audioNodes.comp1Input);
+  audioNodes.comp1Input.connect(audioNodes.comp1Compressor);
+  audioNodes.comp1Compressor.connect(audioNodes.comp1Gain);
+  audioNodes.comp1Gain.connect(audioNodes.comp1Output);
+  audioNodes.comp1Input.connect(audioNodes.comp1Bypass);
+  audioNodes.comp1Bypass.connect(audioNodes.comp1Output);
+
+  // === DISTORTION ===
+  audioNodes.distInput = ctx.createGain();
+  audioNodes.distPreGain = ctx.createGain();
+  audioNodes.distWaveshaper = ctx.createWaveShaper();
+  audioNodes.distToneFilter = ctx.createBiquadFilter();
+  audioNodes.distPostGain = ctx.createGain();
+  audioNodes.distBypass = ctx.createGain();
+  audioNodes.distOutput = ctx.createGain();
+
+  // Set initial distortion params
+  audioNodes.distPreGain.gain.value = mapDrive(state.distortion.drive);
+  audioNodes.distWaveshaper.curve = makeDistortionCurve(state.distortion.drive);
+  audioNodes.distWaveshaper.oversample = '4x';
+  audioNodes.distToneFilter.type = 'lowpass';
+  audioNodes.distToneFilter.frequency.value = mapTone(state.distortion.tone);
+  audioNodes.distToneFilter.Q.value = 0.7;
+
+  // Initial bypass state
+  audioNodes.distPostGain.gain.value = 0;
+  audioNodes.distBypass.gain.value = 1;
+
+  // Connect distortion: input -> [preGain -> waveshaper -> tone -> postGain] + [bypass] -> output
+  audioNodes.comp1Output.connect(audioNodes.distInput);
+  audioNodes.distInput.connect(audioNodes.distPreGain);
+  audioNodes.distPreGain.connect(audioNodes.distWaveshaper);
+  audioNodes.distWaveshaper.connect(audioNodes.distToneFilter);
+  audioNodes.distToneFilter.connect(audioNodes.distPostGain);
+  audioNodes.distPostGain.connect(audioNodes.distOutput);
+  audioNodes.distInput.connect(audioNodes.distBypass);
+  audioNodes.distBypass.connect(audioNodes.distOutput);
+
+  // === COMPRESSOR 2 ===
+  audioNodes.comp2Input = ctx.createGain();
+  audioNodes.comp2Compressor = ctx.createDynamicsCompressor();
+  audioNodes.comp2Gain = ctx.createGain();
+  audioNodes.comp2Bypass = ctx.createGain();
+  audioNodes.comp2Output = ctx.createGain();
+
+  // Set initial compressor params
+  audioNodes.comp2Compressor.threshold.value = mapThreshold(state.comp2.threshold);
+  audioNodes.comp2Compressor.ratio.value = mapRatio(state.comp2.ratio);
+  audioNodes.comp2Compressor.attack.value = mapAttack(state.comp2.attack);
+  audioNodes.comp2Compressor.release.value = mapRelease(state.comp2.release);
+  audioNodes.comp2Compressor.knee.value = 6;
+
+  // Initial bypass state
+  audioNodes.comp2Gain.gain.value = 0;
+  audioNodes.comp2Bypass.gain.value = 1;
+
+  // Connect comp2: input -> [compressor -> gain] + [bypass] -> output
+  audioNodes.distOutput.connect(audioNodes.comp2Input);
+  audioNodes.comp2Input.connect(audioNodes.comp2Compressor);
+  audioNodes.comp2Compressor.connect(audioNodes.comp2Gain);
+  audioNodes.comp2Gain.connect(audioNodes.comp2Output);
+  audioNodes.comp2Input.connect(audioNodes.comp2Bypass);
+  audioNodes.comp2Bypass.connect(audioNodes.comp2Output);
+
+  // Connect final output
+  audioNodes.comp2Output.connect(ctx.destination);
+
+  // Apply current pedal states (in case any were toggled before audio started)
+  updateBypass('comp1');
+  updateBypass('distortion');
+  updateBypass('comp2');
+}
+
+// Start audio
 async function startAudio() {
   if (state.audioStarted) {
     // Stop audio
     if (state.audioContext) {
       await state.audioContext.close();
       state.audioContext = null;
+      audioNodes = {};
     }
     state.audioStarted = false;
     startButton.textContent = 'Start Audio';
@@ -190,9 +453,8 @@ async function startAudio() {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     const source = state.audioContext.createMediaStreamSource(stream);
 
-    // For now, just connect input to output (passthrough)
-    // TODO: Insert effect chain in Phase 2-4
-    source.connect(state.audioContext.destination);
+    // Create the full effect chain
+    createAudioChain(state.audioContext, source);
 
     state.audioStarted = true;
     startButton.textContent = 'Stop Audio';

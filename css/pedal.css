@@ -169,6 +169,26 @@ body {
   gap: 10px;
 }
 
+.knobs.knobs-5 {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.knobs.knobs-5 .knob-group:nth-child(4),
+.knobs.knobs-5 .knob-group:nth-child(5) {
+  grid-column: span 1;
+}
+
+.knobs.knobs-5 .knob-group:nth-child(4) {
+  justify-self: end;
+  padding-right: 10px;
+}
+
+.knobs.knobs-5 .knob-group:nth-child(5) {
+  justify-self: start;
+  padding-left: 10px;
+}
+
 .knob-group {
   display: flex;
   flex-direction: column;
