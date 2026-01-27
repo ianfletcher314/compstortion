@@ -41,7 +41,7 @@ body {
 }
 
 .container {
-  max-width: 1400px;
+  max-width: 1600px;
   width: 100%;
 }
 
@@ -179,10 +179,26 @@ body {
 #comp1,
 #distortion,
 #comp2,
-#amp {
+#amp,
+#modulation,
+#reverb {
   background:
     linear-gradient(180deg, #1a1f1a 0%, #121512 50%, #0a0c0a 100%);
   border-color: #1a2a1a;
+}
+
+/* Modulation pedal layout */
+#modulation .knobs {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  min-height: 60px;
+}
+
+/* Reverb pedal layout */
+#reverb .knobs {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  min-height: 60px;
 }
 
 .amp-pedal {

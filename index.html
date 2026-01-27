@@ -286,6 +286,122 @@
           <div class="screw"></div>
         </div>
       </div>
+
+      <!-- Modulation -->
+      <div class="pedal" id="modulation">
+        <div class="pedal-top">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+
+        <h2 class="pedal-name">Modulation</h2>
+
+        <div class="led-container">
+          <div class="led" id="led-modulation"></div>
+        </div>
+
+        <div class="type-selector" id="mod-type-selector" title="Click to change type (M key)">
+          <span class="type-label">TYPE</span>
+          <span class="type-display" id="mod-type-display">PHASE</span>
+          <span class="type-arrows">&#8592; &#8594;</span>
+        </div>
+
+        <div class="knobs">
+          <div class="knob-group">
+            <div class="knob" data-param="rate" data-pedal="modulation">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Rate</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="depth" data-pedal="modulation">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Depth</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="mix" data-pedal="modulation">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Mix</label>
+          </div>
+        </div>
+
+        <div class="footswitch-container">
+          <button class="footswitch" data-pedal="modulation" aria-label="Toggle Modulation">
+            <span class="footswitch-label">5</span>
+          </button>
+        </div>
+
+        <div class="pedal-bottom">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+      </div>
+
+      <!-- Reverb -->
+      <div class="pedal" id="reverb">
+        <div class="pedal-top">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+
+        <h2 class="pedal-name">Reverb</h2>
+
+        <div class="led-container">
+          <div class="led" id="led-reverb"></div>
+        </div>
+
+        <div class="type-selector" id="reverb-type-selector" title="Click to change type (R key)">
+          <span class="type-label">TYPE</span>
+          <span class="type-display" id="reverb-type-display">SPRING</span>
+          <span class="type-arrows">&#8592; &#8594;</span>
+        </div>
+
+        <div class="knobs">
+          <div class="knob-group">
+            <div class="knob" data-param="decay" data-pedal="reverb">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Decay</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="tone" data-pedal="reverb">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Tone</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="mix" data-pedal="reverb">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Mix</label>
+          </div>
+        </div>
+
+        <div class="footswitch-container">
+          <button class="footswitch" data-pedal="reverb" aria-label="Toggle Reverb">
+            <span class="footswitch-label">6</span>
+          </button>
+        </div>
+
+        <div class="pedal-bottom">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+      </div>
     </div>
 
     <div class="controls">
@@ -296,7 +412,7 @@
     </div>
 
     <div class="instructions">
-      <p>Connect your guitar via USB interface, click "Start Audio", then use footswitches (or keys 1-2-3-4) to toggle effects. Press D to cycle distortion types, A to cycle amp models.</p>
+      <p>Connect your guitar via USB interface, click "Start Audio", then use footswitches (or keys 1-6) to toggle effects. Press D/A/M/R to cycle distortion/amp/modulation/reverb types.</p>
     </div>
   </div>
 

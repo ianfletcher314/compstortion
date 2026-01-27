@@ -16,12 +16,30 @@ const AMP_TYPES = [
   { id: 'vintage', name: 'VINTAGE', description: 'Vox-style chimey breakup' },
 ];
 
+// Modulation types
+const MOD_TYPES = [
+  { id: 'phaser', name: 'PHASE', description: 'Classic phaser sweep' },
+  { id: 'flanger', name: 'FLANGE', description: 'Jet-like flanging effect' },
+  { id: 'leslie', name: 'LESLIE', description: 'Rotary speaker simulation' },
+  { id: 'vibrato', name: 'VIBRATO', description: 'Pitch modulation' },
+  { id: 'tremolo', name: 'TREM', description: 'Volume modulation' },
+];
+
+// Reverb types
+const REVERB_TYPES = [
+  { id: 'spring', name: 'SPRING', description: 'Classic spring tank reverb' },
+  { id: 'plate', name: 'PLATE', description: 'Smooth plate reverb' },
+  { id: 'hall', name: 'HALL', description: 'Large hall reverb' },
+];
+
 // Pedal state
 const state = {
   comp1: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
   distortion: { active: false, drive: 0.5, tone: 0.5, level: 0.5, type: 0 },
   comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
   amp: { active: true, bass: 0.5, mid: 0.5, treble: 0.5, gain: 0.3, type: 0 },
+  modulation: { active: false, rate: 0.4, depth: 0.5, mix: 0.5, type: 0 },
+  reverb: { active: false, decay: 0.5, mix: 0.3, tone: 0.5, type: 0 },
   audioStarted: false,
   audioContext: null,
 };
@@ -128,6 +146,63 @@ function mapAmpGain(value, typeIndex = 0) {
     default:
       return 1 + (value * 10);
   }
+}
+
+// Modulation mapping functions
+function mapModRate(value, typeIndex = 0) {
+  const type = MOD_TYPES[typeIndex]?.id || 'phaser';
+  switch (type) {
+    case 'phaser':
+      return 0.1 + (value * 4); // 0.1-4.1 Hz
+    case 'flanger':
+      return 0.05 + (value * 2); // 0.05-2.05 Hz
+    case 'leslie':
+      return 0.5 + (value * 6); // 0.5-6.5 Hz (slow to fast)
+    case 'vibrato':
+      return 1 + (value * 8); // 1-9 Hz
+    case 'tremolo':
+      return 1 + (value * 12); // 1-13 Hz
+    default:
+      return 0.5 + (value * 4);
+  }
+}
+
+function mapModDepth(value, typeIndex = 0) {
+  const type = MOD_TYPES[typeIndex]?.id || 'phaser';
+  switch (type) {
+    case 'phaser':
+      return value * 1000; // 0-1000 (frequency sweep range)
+    case 'flanger':
+      return 0.001 + (value * 0.01); // 1-11ms delay time sweep
+    case 'leslie':
+      return value; // 0-1 intensity
+    case 'vibrato':
+      return value * 50; // 0-50 cents pitch deviation
+    case 'tremolo':
+      return value; // 0-1 volume modulation depth
+    default:
+      return value;
+  }
+}
+
+// Reverb mapping functions
+function mapReverbDecay(value, typeIndex = 0) {
+  const type = REVERB_TYPES[typeIndex]?.id || 'spring';
+  switch (type) {
+    case 'spring':
+      return 0.5 + (value * 2); // 0.5-2.5 seconds
+    case 'plate':
+      return 1 + (value * 3); // 1-4 seconds
+    case 'hall':
+      return 2 + (value * 6); // 2-8 seconds
+    default:
+      return 1 + (value * 3);
+  }
+}
+
+function mapReverbTone(value) {
+  // Low-pass filter frequency for reverb
+  return 1000 + (value * 8000); // 1kHz - 9kHz
 }
 
 // Update tone filter Q and characteristics based on pedal type
@@ -433,6 +508,74 @@ function setupAmpTypeSelector() {
   updateAmpTypeDisplay();
 }
 
+// Update modulation type display
+function updateModTypeDisplay() {
+  const typeDisplay = document.getElementById('mod-type-display');
+  if (typeDisplay) {
+    const currentType = MOD_TYPES[state.modulation.type];
+    typeDisplay.textContent = currentType.name;
+    typeDisplay.title = currentType.description;
+  }
+}
+
+// Update reverb type display
+function updateReverbTypeDisplay() {
+  const typeDisplay = document.getElementById('reverb-type-display');
+  if (typeDisplay) {
+    const currentType = REVERB_TYPES[state.reverb.type];
+    typeDisplay.textContent = currentType.name;
+    typeDisplay.title = currentType.description;
+  }
+}
+
+// Cycle modulation type
+function cycleModType(direction = 1) {
+  state.modulation.type = (state.modulation.type + direction + MOD_TYPES.length) % MOD_TYPES.length;
+  updateModTypeDisplay();
+  updateAudioParams('modulation', 'type');
+  console.log(`Modulation type: ${MOD_TYPES[state.modulation.type].name}`);
+}
+
+// Cycle reverb type
+function cycleReverbType(direction = 1) {
+  state.reverb.type = (state.reverb.type + direction + REVERB_TYPES.length) % REVERB_TYPES.length;
+  updateReverbTypeDisplay();
+  updateAudioParams('reverb', 'type');
+  console.log(`Reverb type: ${REVERB_TYPES[state.reverb.type].name}`);
+}
+
+// Setup modulation type selector
+function setupModTypeSelector() {
+  const typeSelector = document.getElementById('mod-type-selector');
+  if (typeSelector) {
+    typeSelector.addEventListener('click', (e) => {
+      e.preventDefault();
+      cycleModType(1);
+    });
+    typeSelector.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      cycleModType(-1);
+    });
+  }
+  updateModTypeDisplay();
+}
+
+// Setup reverb type selector
+function setupReverbTypeSelector() {
+  const typeSelector = document.getElementById('reverb-type-selector');
+  if (typeSelector) {
+    typeSelector.addEventListener('click', (e) => {
+      e.preventDefault();
+      cycleReverbType(1);
+    });
+    typeSelector.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      cycleReverbType(-1);
+    });
+  }
+  updateReverbTypeDisplay();
+}
+
 // Update knob visual rotation (value 0-1 maps to -135 to +135 degrees)
 function updateKnobRotation(knob, value) {
   const rotation = (value * 270) - 135;
@@ -500,6 +643,103 @@ function updateAmpEQForType(typeIndex) {
   // Update the waveshaper curve
   const gain = mapAmpGain(state.amp.gain, typeIndex);
   audioNodes.ampWaveshaper.curve = makeAmpCurve(gain, typeIndex);
+}
+
+// Update modulation depth based on type
+function updateModDepth() {
+  if (!audioNodes || !audioNodes.modLFOGain) return;
+
+  const type = MOD_TYPES[state.modulation.type]?.id || 'phaser';
+  const depth = state.modulation.depth;
+
+  switch (type) {
+    case 'phaser':
+      audioNodes.modLFOGain.gain.value = mapModDepth(depth, state.modulation.type);
+      break;
+    case 'flanger':
+      audioNodes.modLFOGain.gain.value = mapModDepth(depth, state.modulation.type);
+      break;
+    case 'leslie':
+      audioNodes.modLFOGain.gain.value = depth * 0.5;
+      if (audioNodes.modLFOGain2) audioNodes.modLFOGain2.gain.value = depth * 30;
+      break;
+    case 'vibrato':
+      audioNodes.modLFOGain.gain.value = depth * 50;
+      break;
+    case 'tremolo':
+      audioNodes.modLFOGain.gain.value = depth;
+      break;
+  }
+}
+
+// Update modulation type - reconfigure the modulation chain
+function updateModulationType() {
+  if (!audioNodes || !state.audioContext) return;
+
+  const type = MOD_TYPES[state.modulation.type]?.id || 'phaser';
+
+  // Update LFO frequency for new type
+  audioNodes.modLFO.frequency.value = mapModRate(state.modulation.rate, state.modulation.type);
+
+  // Update depth for new type
+  updateModDepth();
+
+  // Update filter characteristics for phaser
+  if (type === 'phaser' && audioNodes.modAllpass) {
+    for (let i = 0; i < audioNodes.modAllpass.length; i++) {
+      audioNodes.modAllpass[i].frequency.value = 1000 + (i * 500);
+    }
+  }
+
+  console.log(`Modulation type updated to: ${type}`);
+}
+
+// Generate reverb impulse response
+function generateReverbIR(ctx, decay, type) {
+  const sampleRate = ctx.sampleRate;
+  const length = sampleRate * decay;
+  const impulse = ctx.createBuffer(2, length, sampleRate);
+
+  for (let channel = 0; channel < 2; channel++) {
+    const channelData = impulse.getChannelData(channel);
+
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      let envelope;
+
+      switch (type) {
+        case 'spring':
+          // Spring reverb: quick initial decay with metallic reflections
+          envelope = Math.exp(-3 * t / decay) * (1 + 0.5 * Math.sin(t * 200) * Math.exp(-10 * t));
+          break;
+        case 'plate':
+          // Plate reverb: dense, smooth decay
+          envelope = Math.exp(-2 * t / decay);
+          break;
+        case 'hall':
+          // Hall reverb: slow buildup, long tail
+          envelope = Math.exp(-1.5 * t / decay) * (1 - Math.exp(-20 * t));
+          break;
+        default:
+          envelope = Math.exp(-2 * t / decay);
+      }
+
+      channelData[i] = (Math.random() * 2 - 1) * envelope;
+    }
+  }
+
+  return impulse;
+}
+
+// Update reverb impulse response
+function updateReverbIR() {
+  if (!audioNodes || !state.audioContext || !audioNodes.reverbConvolver) return;
+
+  const type = REVERB_TYPES[state.reverb.type]?.id || 'spring';
+  const decay = mapReverbDecay(state.reverb.decay, state.reverb.type);
+
+  audioNodes.reverbConvolver.buffer = generateReverbIR(state.audioContext, decay, type);
+  console.log(`Reverb updated: ${type}, decay: ${decay}s`);
 }
 
 // Update audio parameters based on current state
@@ -600,6 +840,42 @@ function updateAudioParams(pedal, param) {
         break;
       case 'type':
         updateAmpEQForType(value);
+        break;
+    }
+  } else if (pedal === 'modulation' && audioNodes.modLFO) {
+    switch (param) {
+      case 'rate':
+        audioNodes.modLFO.frequency.value = mapModRate(value, state.modulation.type);
+        break;
+      case 'depth':
+        updateModDepth();
+        break;
+      case 'mix':
+        if (state.modulation.active) {
+          audioNodes.modWetGain.gain.value = value;
+          audioNodes.modDryGain.gain.value = 1 - value;
+        }
+        break;
+      case 'type':
+        updateModulationType();
+        break;
+    }
+  } else if (pedal === 'reverb' && audioNodes.reverbConvolver) {
+    switch (param) {
+      case 'decay':
+        updateReverbIR();
+        break;
+      case 'mix':
+        if (state.reverb.active) {
+          audioNodes.reverbWetGain.gain.value = value;
+          audioNodes.reverbDryGain.gain.value = 1 - value;
+        }
+        break;
+      case 'tone':
+        audioNodes.reverbToneFilter.frequency.value = mapReverbTone(value);
+        break;
+      case 'type':
+        updateReverbIR();
         break;
     }
   }
@@ -736,6 +1012,30 @@ function updateBypass(pedalId) {
       audioNodes.ampPostGain.gain.value = 0;
       console.log(`amp OFF: bypass=1`);
     }
+  } else if (pedalId === 'modulation') {
+    if (isActive) {
+      audioNodes.modBypass.gain.value = 0;
+      audioNodes.modWetGain.gain.value = state.modulation.mix;
+      audioNodes.modDryGain.gain.value = 1 - state.modulation.mix;
+      console.log(`modulation ON: bypass=0, mix=${state.modulation.mix}`);
+    } else {
+      audioNodes.modBypass.gain.value = 1;
+      audioNodes.modWetGain.gain.value = 0;
+      audioNodes.modDryGain.gain.value = 0;
+      console.log(`modulation OFF: bypass=1`);
+    }
+  } else if (pedalId === 'reverb') {
+    if (isActive) {
+      audioNodes.reverbBypass.gain.value = 0;
+      audioNodes.reverbWetGain.gain.value = state.reverb.mix;
+      audioNodes.reverbDryGain.gain.value = 1 - state.reverb.mix;
+      console.log(`reverb ON: bypass=0, mix=${state.reverb.mix}`);
+    } else {
+      audioNodes.reverbBypass.gain.value = 1;
+      audioNodes.reverbWetGain.gain.value = 0;
+      audioNodes.reverbDryGain.gain.value = 0;
+      console.log(`reverb OFF: bypass=1`);
+    }
   }
 }
 
@@ -767,7 +1067,7 @@ function setupFootswitches() {
   });
 }
 
-// Keyboard shortcuts (1, 2, 3, 4 for each pedal, D for distortion type, A for amp type)
+// Keyboard shortcuts (1-6 for each pedal, D for distortion type, A for amp type, M for mod type, R for reverb type)
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
@@ -789,6 +1089,14 @@ function setupKeyboardShortcuts() {
         togglePedal('amp');
         animateFootswitch('amp');
         break;
+      case '5':
+        togglePedal('modulation');
+        animateFootswitch('modulation');
+        break;
+      case '6':
+        togglePedal('reverb');
+        animateFootswitch('reverb');
+        break;
       case 'd':
         // Cycle distortion type (shift+d for reverse)
         cycleDistortionType(e.shiftKey ? -1 : 1);
@@ -796,6 +1104,14 @@ function setupKeyboardShortcuts() {
       case 'a':
         // Cycle amp type (shift+a for reverse)
         cycleAmpType(e.shiftKey ? -1 : 1);
+        break;
+      case 'm':
+        // Cycle modulation type (shift+m for reverse)
+        cycleModType(e.shiftKey ? -1 : 1);
+        break;
+      case 'r':
+        // Cycle reverb type (shift+r for reverse)
+        cycleReverbType(e.shiftKey ? -1 : 1);
         break;
     }
   });
@@ -1037,26 +1353,152 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.ampInput.connect(audioNodes.ampBypass);
   audioNodes.ampBypass.connect(audioNodes.ampOutput);
 
+  // === MODULATION ===
+  audioNodes.modInput = ctx.createGain();
+  audioNodes.modOutput = ctx.createGain();
+  audioNodes.modBypass = ctx.createGain();
+  audioNodes.modWetGain = ctx.createGain();
+  audioNodes.modDryGain = ctx.createGain();
+
+  // LFO for modulation
+  audioNodes.modLFO = ctx.createOscillator();
+  audioNodes.modLFO.type = 'sine';
+  audioNodes.modLFO.frequency.value = mapModRate(state.modulation.rate, state.modulation.type);
+  audioNodes.modLFOGain = ctx.createGain();
+  audioNodes.modLFOGain.gain.value = 0;
+
+  // Allpass filters for phaser effect (4-stage)
+  audioNodes.modAllpass = [];
+  for (let i = 0; i < 4; i++) {
+    const allpass = ctx.createBiquadFilter();
+    allpass.type = 'allpass';
+    allpass.frequency.value = 1000 + (i * 500);
+    allpass.Q.value = 0.5;
+    audioNodes.modAllpass.push(allpass);
+  }
+
+  // Delay for flanger/chorus
+  audioNodes.modDelay = ctx.createDelay(0.05);
+  audioNodes.modDelay.delayTime.value = 0.005;
+
+  // Tremolo gain node
+  audioNodes.modTremoloGain = ctx.createGain();
+  audioNodes.modTremoloGain.gain.value = 1;
+
+  // Second LFO for leslie horn simulation
+  audioNodes.modLFO2 = ctx.createOscillator();
+  audioNodes.modLFO2.type = 'sine';
+  audioNodes.modLFO2.frequency.value = mapModRate(state.modulation.rate, state.modulation.type) * 1.1;
+  audioNodes.modLFOGain2 = ctx.createGain();
+  audioNodes.modLFOGain2.gain.value = 0;
+
+  // Start LFOs
+  audioNodes.modLFO.start();
+  audioNodes.modLFO2.start();
+
+  // Connect LFO to modulation targets
+  audioNodes.modLFO.connect(audioNodes.modLFOGain);
+
+  // Phaser chain: input -> allpass filters -> wet
+  let lastNode = audioNodes.modInput;
+  for (const allpass of audioNodes.modAllpass) {
+    lastNode.connect(allpass);
+    audioNodes.modLFOGain.connect(allpass.frequency);
+    lastNode = allpass;
+  }
+  lastNode.connect(audioNodes.modWetGain);
+
+  // Also connect input through delay for flanger effect (LFO modulates delay time)
+  audioNodes.modInput.connect(audioNodes.modDelay);
+  audioNodes.modLFOGain.connect(audioNodes.modDelay.delayTime);
+  audioNodes.modDelay.connect(audioNodes.modTremoloGain);
+  audioNodes.modTremoloGain.connect(audioNodes.modWetGain);
+
+  // Tremolo: LFO modulates gain
+  audioNodes.modLFO.connect(audioNodes.modTremoloGain.gain);
+
+  // Dry path
+  audioNodes.modInput.connect(audioNodes.modDryGain);
+  audioNodes.modDryGain.connect(audioNodes.modOutput);
+  audioNodes.modWetGain.connect(audioNodes.modOutput);
+
+  // Bypass path
+  audioNodes.modInput.connect(audioNodes.modBypass);
+  audioNodes.modBypass.connect(audioNodes.modOutput);
+
+  // Initial bypass state
+  audioNodes.modWetGain.gain.value = 0;
+  audioNodes.modDryGain.gain.value = 0;
+  audioNodes.modBypass.gain.value = 1;
+
+  // Connect amp to modulation
+  audioNodes.ampOutput.connect(audioNodes.modInput);
+
+  // === REVERB ===
+  audioNodes.reverbInput = ctx.createGain();
+  audioNodes.reverbOutput = ctx.createGain();
+  audioNodes.reverbBypass = ctx.createGain();
+  audioNodes.reverbWetGain = ctx.createGain();
+  audioNodes.reverbDryGain = ctx.createGain();
+
+  // Convolver for reverb
+  audioNodes.reverbConvolver = ctx.createConvolver();
+
+  // Tone filter for reverb
+  audioNodes.reverbToneFilter = ctx.createBiquadFilter();
+  audioNodes.reverbToneFilter.type = 'lowpass';
+  audioNodes.reverbToneFilter.frequency.value = mapReverbTone(state.reverb.tone);
+  audioNodes.reverbToneFilter.Q.value = 0.5;
+
+  // Generate initial impulse response
+  const initialDecay = mapReverbDecay(state.reverb.decay, state.reverb.type);
+  const initialType = REVERB_TYPES[state.reverb.type]?.id || 'spring';
+  audioNodes.reverbConvolver.buffer = generateReverbIR(ctx, initialDecay, initialType);
+
+  // Connect reverb chain
+  audioNodes.reverbInput.connect(audioNodes.reverbConvolver);
+  audioNodes.reverbConvolver.connect(audioNodes.reverbToneFilter);
+  audioNodes.reverbToneFilter.connect(audioNodes.reverbWetGain);
+  audioNodes.reverbWetGain.connect(audioNodes.reverbOutput);
+
+  // Dry path
+  audioNodes.reverbInput.connect(audioNodes.reverbDryGain);
+  audioNodes.reverbDryGain.connect(audioNodes.reverbOutput);
+
+  // Bypass path
+  audioNodes.reverbInput.connect(audioNodes.reverbBypass);
+  audioNodes.reverbBypass.connect(audioNodes.reverbOutput);
+
+  // Initial bypass state
+  audioNodes.reverbWetGain.gain.value = 0;
+  audioNodes.reverbDryGain.gain.value = 0;
+  audioNodes.reverbBypass.gain.value = 1;
+
+  // Connect modulation to reverb
+  audioNodes.modOutput.connect(audioNodes.reverbInput);
+
   // === STEREO OUTPUT (dual mono) ===
   // Use a channel splitter and merger to send mono signal to both L and R
   audioNodes.stereoSplitter = ctx.createChannelSplitter(2);
   audioNodes.stereoMerger = ctx.createChannelMerger(2);
 
-  // Connect amp output to splitter, then merge channel 0 to both L and R
-  audioNodes.ampOutput.connect(audioNodes.stereoSplitter);
+  // Connect reverb output to splitter, then merge channel 0 to both L and R
+  audioNodes.reverbOutput.connect(audioNodes.stereoSplitter);
   audioNodes.stereoSplitter.connect(audioNodes.stereoMerger, 0, 0); // Input ch 0 -> Output L
   audioNodes.stereoSplitter.connect(audioNodes.stereoMerger, 0, 1); // Input ch 0 -> Output R
 
   // Final output
   audioNodes.stereoMerger.connect(ctx.destination);
 
-  console.log('Audio chain created with amp simulator (stereo output)');
+  console.log('Audio chain created with amp, modulation, and reverb (stereo output)');
 
   // Apply current pedal states
   updateBypass('comp1');
   updateBypass('distortion');
   updateBypass('comp2');
   updateBypass('amp');
+  updateBypass('modulation');
+  updateBypass('reverb');
 
   // Initialize amp LED state
   const ampLed = document.getElementById('led-amp');
@@ -1122,6 +1564,8 @@ function init() {
   setupKeyboardShortcuts();
   setupTypeSelector();
   setupAmpTypeSelector();
+  setupModTypeSelector();
+  setupReverbTypeSelector();
   populateInputDevices();
 
   startButton.addEventListener('click', startAudio);
@@ -1132,7 +1576,7 @@ function init() {
     ampLed.classList.add('active');
   }
 
-  console.log('Compstortion initialized with amp simulator');
+  console.log('Compstortion initialized with amp, modulation, and reverb');
 }
 
 document.addEventListener('DOMContentLoaded', init);
