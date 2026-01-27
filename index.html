@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compstortion - Guitar Pedal</title>
+  <link rel="stylesheet" href="css/pedal.css">
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">Compstortion</h1>
+
+    <div class="pedal-board">
+      <!-- Compressor 1 -->
+      <div class="pedal" id="comp1">
+        <div class="pedal-top">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+
+        <h2 class="pedal-name">Comp 1</h2>
+
+        <div class="led-container">
+          <div class="led" id="led-comp1"></div>
+        </div>
+
+        <div class="knobs">
+          <div class="knob-group">
+            <div class="knob" data-param="threshold" data-pedal="comp1">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Thresh</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="ratio" data-pedal="comp1">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Ratio</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="attack" data-pedal="comp1">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Attack</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="release" data-pedal="comp1">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Release</label>
+          </div>
+        </div>
+
+        <div class="footswitch-container">
+          <button class="footswitch" data-pedal="comp1" aria-label="Toggle Compressor 1">
+            <span class="footswitch-label">1</span>
+          </button>
+        </div>
+
+        <div class="pedal-bottom">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+      </div>
+
+      <!-- Distortion -->
+      <div class="pedal" id="distortion">
+        <div class="pedal-top">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+
+        <h2 class="pedal-name">Distortion</h2>
+
+        <div class="led-container">
+          <div class="led" id="led-distortion"></div>
+        </div>
+
+        <div class="knobs">
+          <div class="knob-group">
+            <div class="knob" data-param="drive" data-pedal="distortion">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Drive</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="tone" data-pedal="distortion">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Tone</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="level" data-pedal="distortion">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Level</label>
+          </div>
+        </div>
+
+        <div class="footswitch-container">
+          <button class="footswitch" data-pedal="distortion" aria-label="Toggle Distortion">
+            <span class="footswitch-label">2</span>
+          </button>
+        </div>
+
+        <div class="pedal-bottom">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+      </div>
+
+      <!-- Compressor 2 -->
+      <div class="pedal" id="comp2">
+        <div class="pedal-top">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+
+        <h2 class="pedal-name">Comp 2</h2>
+
+        <div class="led-container">
+          <div class="led" id="led-comp2"></div>
+        </div>
+
+        <div class="knobs">
+          <div class="knob-group">
+            <div class="knob" data-param="threshold" data-pedal="comp2">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Thresh</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="ratio" data-pedal="comp2">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Ratio</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="attack" data-pedal="comp2">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Attack</label>
+          </div>
+          <div class="knob-group">
+            <div class="knob" data-param="release" data-pedal="comp2">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Release</label>
+          </div>
+        </div>
+
+        <div class="footswitch-container">
+          <button class="footswitch" data-pedal="comp2" aria-label="Toggle Compressor 2">
+            <span class="footswitch-label">3</span>
+          </button>
+        </div>
+
+        <div class="pedal-bottom">
+          <div class="screw"></div>
+          <div class="screw"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="start-audio" class="start-button">Start Audio</button>
+      <select id="input-select" class="input-select" disabled>
+        <option value="">Select Input Device</option>
+      </select>
+    </div>
+
+    <div class="instructions">
+      <p>Connect your guitar via USB interface, click "Start Audio", then use footswitches (or keys 1-2-3) to toggle effects.</p>
+    </div>
+  </div>
+
+  <script src="js/main.js" type="module"></script>
+</body>
+</html>

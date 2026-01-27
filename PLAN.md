@@ -18,10 +18,10 @@ Each stage can be toggled on/off independently via stomp switches.
 
 ## Phase 1: Project Setup
 
-- [ ] Create basic HTML/CSS/JS structure
+- [x] Create basic HTML/CSS/JS structure
 - [ ] Set up GitHub Pages deployment
-- [ ] Create responsive layout that works on desktop and mobile
-- [ ] Add basic stomp box visual design (metal enclosure, knobs, LED indicators)
+- [x] Create responsive layout that works on desktop and mobile
+- [x] Add basic stomp box visual design (metal enclosure, knobs, LED indicators)
 
 ## Phase 2: Audio Engine
 
@@ -61,19 +61,19 @@ Implementation:
 ## Phase 5: UI/UX - Stomp Box Design
 
 Visual elements:
-- [ ] Metal enclosure texture/gradient
-- [ ] Realistic knob graphics with rotation animation
-- [ ] Rubber stomp switches that depress on click
-- [ ] LED indicators (red/green) for each stage
+- [x] Metal enclosure texture/gradient
+- [x] Realistic knob graphics with rotation animation
+- [x] Rubber stomp switches that depress on click
+- [x] LED indicators (red/green) for each stage
 - [ ] Jack sockets on sides (decorative)
-- [ ] Screw details in corners
-- [ ] Label/branding area
+- [x] Screw details in corners
+- [x] Label/branding area
 
 Interactions:
-- [ ] Click/drag knobs to adjust values
-- [ ] Click stomp switches to toggle stages
-- [ ] Keyboard shortcuts for stomp switches (1, 2, 3)
-- [ ] Touch support for mobile
+- [x] Click/drag knobs to adjust values
+- [x] Click stomp switches to toggle stages
+- [x] Keyboard shortcuts for stomp switches (1, 2, 3)
+- [x] Touch support for mobile
 
 ## Phase 6: Presets & Settings
 
