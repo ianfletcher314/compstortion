@@ -5,37 +5,19 @@ const state = {
   comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5 },
   audioStarted: false,
   audioContext: null,
-  nodes: null,
 };
+
+// Audio node references
+let audioNodes = null;
 
 // DOM Elements
 const startButton = document.getElementById('start-audio');
 const inputSelect = document.getElementById('input-select');
 
-// Audio node references
-let audioNodes = {
-  source: null,
-  // Comp 1
-  comp1Input: null,
-  comp1Compressor: null,
-  comp1Gain: null,
-  comp1Bypass: null,
-  comp1Output: null,
-  // Distortion
-  distInput: null,
-  distPreGain: null,
-  distWaveshaper: null,
-  distToneFilter: null,
-  distPostGain: null,
-  distBypass: null,
-  distOutput: null,
-  // Comp 2
-  comp2Input: null,
-  comp2Compressor: null,
-  comp2Gain: null,
-  comp2Bypass: null,
-  comp2Output: null,
-};
+// Knob dragging state
+let activeKnob = null;
+let knobStartY = 0;
+let knobStartValue = 0;
 
 // Parameter mapping functions
 function mapThreshold(value) {
@@ -64,36 +46,45 @@ function mapLevel(value) {
 }
 
 function mapDrive(value) {
-  // 0-1 -> 1 to 50 (pre-gain multiplier)
-  return 1 + (value * 49);
+  // 0-1 -> 1 to 20 (pre-gain multiplier)
+  return 1 + (value * 19);
 }
 
 function mapTone(value) {
-  // 0-1 -> 200Hz to 8000Hz
-  return 200 + (value * 7800);
+  // 0-1 -> 500Hz to 8000Hz
+  return 500 + (value * 7500);
 }
 
 // Create distortion curve for waveshaper
 function makeDistortionCurve(amount) {
   const samples = 44100;
   const curve = new Float32Array(samples);
-  const deg = Math.PI / 180;
-  const k = amount * 100;
+  const k = amount * 50;
 
   for (let i = 0; i < samples; i++) {
     const x = (i * 2) / samples - 1;
-    curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+    // Soft clipping curve
+    curve[i] = Math.tanh(k * x) / Math.tanh(k || 1);
   }
   return curve;
 }
 
 // Initialize knob rotations from state
 function initKnobs() {
-  document.querySelectorAll('.knob').forEach(knob => {
+  const knobs = document.querySelectorAll('.knob');
+  console.log(`Found ${knobs.length} knobs`);
+
+  knobs.forEach(knob => {
     const pedal = knob.dataset.pedal;
     const param = knob.dataset.param;
-    const value = state[pedal][param];
-    updateKnobRotation(knob, value);
+
+    if (state[pedal] && state[pedal][param] !== undefined) {
+      const value = state[pedal][param];
+      updateKnobRotation(knob, value);
+      console.log(`Init knob: ${pedal}.${param} = ${value}`);
+    } else {
+      console.warn(`Missing state for ${pedal}.${param}`);
+    }
   });
 }
 
@@ -101,147 +92,187 @@ function initKnobs() {
 function updateKnobRotation(knob, value) {
   const rotation = (value * 270) - 135;
   const inner = knob.querySelector('.knob-inner');
-  inner.style.transform = `rotate(${rotation}deg)`;
+  if (inner) {
+    inner.style.transform = `rotate(${rotation}deg)`;
+  }
 }
 
 // Update audio parameters based on current state
 function updateAudioParams(pedal, param) {
-  if (!state.audioContext || !audioNodes.comp1Compressor) return;
+  if (!audioNodes) return;
 
   const value = state[pedal][param];
+  console.log(`Updating ${pedal}.${param} = ${value}`);
 
-  if (pedal === 'comp1') {
+  if (pedal === 'comp1' && audioNodes.comp1Compressor) {
     switch (param) {
       case 'threshold':
-        audioNodes.comp1Compressor.threshold.setValueAtTime(mapThreshold(value), state.audioContext.currentTime);
+        audioNodes.comp1Compressor.threshold.value = mapThreshold(value);
         break;
       case 'ratio':
-        audioNodes.comp1Compressor.ratio.setValueAtTime(mapRatio(value), state.audioContext.currentTime);
+        audioNodes.comp1Compressor.ratio.value = mapRatio(value);
         break;
       case 'attack':
-        audioNodes.comp1Compressor.attack.setValueAtTime(mapAttack(value), state.audioContext.currentTime);
+        audioNodes.comp1Compressor.attack.value = mapAttack(value);
         break;
       case 'release':
-        audioNodes.comp1Compressor.release.setValueAtTime(mapRelease(value), state.audioContext.currentTime);
+        audioNodes.comp1Compressor.release.value = mapRelease(value);
         break;
       case 'level':
-        audioNodes.comp1Gain.gain.setValueAtTime(mapLevel(value), state.audioContext.currentTime);
+        if (state.comp1.active) {
+          audioNodes.comp1Gain.gain.value = mapLevel(value);
+        }
         break;
     }
-  } else if (pedal === 'distortion') {
+  } else if (pedal === 'distortion' && audioNodes.distWaveshaper) {
     switch (param) {
       case 'drive':
-        audioNodes.distPreGain.gain.setValueAtTime(mapDrive(value), state.audioContext.currentTime);
+        audioNodes.distPreGain.gain.value = mapDrive(value);
         audioNodes.distWaveshaper.curve = makeDistortionCurve(value);
         break;
       case 'tone':
-        audioNodes.distToneFilter.frequency.setValueAtTime(mapTone(value), state.audioContext.currentTime);
+        audioNodes.distToneFilter.frequency.value = mapTone(value);
         break;
       case 'level':
-        audioNodes.distPostGain.gain.setValueAtTime(mapLevel(value), state.audioContext.currentTime);
+        if (state.distortion.active) {
+          audioNodes.distPostGain.gain.value = mapLevel(value);
+        }
         break;
     }
-  } else if (pedal === 'comp2') {
+  } else if (pedal === 'comp2' && audioNodes.comp2Compressor) {
     switch (param) {
       case 'threshold':
-        audioNodes.comp2Compressor.threshold.setValueAtTime(mapThreshold(value), state.audioContext.currentTime);
+        audioNodes.comp2Compressor.threshold.value = mapThreshold(value);
         break;
       case 'ratio':
-        audioNodes.comp2Compressor.ratio.setValueAtTime(mapRatio(value), state.audioContext.currentTime);
+        audioNodes.comp2Compressor.ratio.value = mapRatio(value);
         break;
       case 'attack':
-        audioNodes.comp2Compressor.attack.setValueAtTime(mapAttack(value), state.audioContext.currentTime);
+        audioNodes.comp2Compressor.attack.value = mapAttack(value);
         break;
       case 'release':
-        audioNodes.comp2Compressor.release.setValueAtTime(mapRelease(value), state.audioContext.currentTime);
+        audioNodes.comp2Compressor.release.value = mapRelease(value);
         break;
       case 'level':
-        audioNodes.comp2Gain.gain.setValueAtTime(mapLevel(value), state.audioContext.currentTime);
+        if (state.comp2.active) {
+          audioNodes.comp2Gain.gain.value = mapLevel(value);
+        }
         break;
     }
   }
 }
 
-// Handle knob dragging
+// Handle knob dragging - single document-level handler
 function setupKnobInteraction() {
-  document.querySelectorAll('.knob').forEach(knob => {
-    let isDragging = false;
-    let startY = 0;
-    let startValue = 0;
-
-    const onMouseDown = (e) => {
-      isDragging = true;
-      startY = e.clientY || e.touches?.[0]?.clientY || 0;
+  // Mouse/touch down on knobs
+  document.addEventListener('mousedown', (e) => {
+    const knob = e.target.closest('.knob');
+    if (knob) {
+      activeKnob = knob;
+      knobStartY = e.clientY;
       const pedal = knob.dataset.pedal;
       const param = knob.dataset.param;
-      startValue = state[pedal][param];
+      knobStartValue = state[pedal][param];
       document.body.style.cursor = 'ns-resize';
       e.preventDefault();
-    };
+    }
+  });
 
-    const onMouseMove = (e) => {
-      if (!isDragging) return;
-
-      const currentY = e.clientY || e.touches?.[0]?.clientY || 0;
-      const deltaY = startY - currentY;
-      const sensitivity = 0.005;
-      let newValue = startValue + (deltaY * sensitivity);
-      newValue = Math.max(0, Math.min(1, newValue));
-
+  document.addEventListener('touchstart', (e) => {
+    const knob = e.target.closest('.knob');
+    if (knob) {
+      activeKnob = knob;
+      knobStartY = e.touches[0].clientY;
       const pedal = knob.dataset.pedal;
       const param = knob.dataset.param;
-      state[pedal][param] = newValue;
-      updateKnobRotation(knob, newValue);
-      updateAudioParams(pedal, param);
-    };
+      knobStartValue = state[pedal][param];
+      e.preventDefault();
+    }
+  }, { passive: false });
 
-    const onMouseUp = () => {
-      isDragging = false;
-      document.body.style.cursor = '';
-    };
+  // Mouse/touch move
+  document.addEventListener('mousemove', (e) => {
+    if (!activeKnob) return;
 
-    knob.addEventListener('mousedown', onMouseDown);
-    knob.addEventListener('touchstart', onMouseDown, { passive: false });
+    const deltaY = knobStartY - e.clientY;
+    const sensitivity = 0.005;
+    let newValue = knobStartValue + (deltaY * sensitivity);
+    newValue = Math.max(0, Math.min(1, newValue));
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('touchmove', onMouseMove, { passive: false });
+    const pedal = activeKnob.dataset.pedal;
+    const param = activeKnob.dataset.param;
+    state[pedal][param] = newValue;
+    updateKnobRotation(activeKnob, newValue);
+    updateAudioParams(pedal, param);
+  });
 
-    document.addEventListener('mouseup', onMouseUp);
-    document.addEventListener('touchend', onMouseUp);
+  document.addEventListener('touchmove', (e) => {
+    if (!activeKnob) return;
+
+    const deltaY = knobStartY - e.touches[0].clientY;
+    const sensitivity = 0.005;
+    let newValue = knobStartValue + (deltaY * sensitivity);
+    newValue = Math.max(0, Math.min(1, newValue));
+
+    const pedal = activeKnob.dataset.pedal;
+    const param = activeKnob.dataset.param;
+    state[pedal][param] = newValue;
+    updateKnobRotation(activeKnob, newValue);
+    updateAudioParams(pedal, param);
+  }, { passive: false });
+
+  // Mouse/touch up
+  document.addEventListener('mouseup', () => {
+    activeKnob = null;
+    document.body.style.cursor = '';
+  });
+
+  document.addEventListener('touchend', () => {
+    activeKnob = null;
   });
 }
 
 // Update bypass routing for a pedal
 function updateBypass(pedalId) {
-  if (!state.audioContext) return;
+  if (!audioNodes) {
+    console.log(`updateBypass(${pedalId}): no audioNodes`);
+    return;
+  }
 
   const isActive = state[pedalId].active;
+  console.log(`updateBypass(${pedalId}): active=${isActive}`);
 
   if (pedalId === 'comp1') {
     if (isActive) {
       // Enable effect: mute bypass, unmute effect chain
-      audioNodes.comp1Bypass.gain.setValueAtTime(0, state.audioContext.currentTime);
-      audioNodes.comp1Gain.gain.setValueAtTime(mapLevel(state.comp1.level), state.audioContext.currentTime);
+      audioNodes.comp1Bypass.gain.value = 0;
+      audioNodes.comp1Gain.gain.value = mapLevel(state.comp1.level);
+      console.log(`comp1 ON: bypass=0, gain=${mapLevel(state.comp1.level)}`);
     } else {
       // Bypass: mute effect chain, unmute bypass
-      audioNodes.comp1Bypass.gain.setValueAtTime(1, state.audioContext.currentTime);
-      audioNodes.comp1Gain.gain.setValueAtTime(0, state.audioContext.currentTime);
+      audioNodes.comp1Bypass.gain.value = 1;
+      audioNodes.comp1Gain.gain.value = 0;
+      console.log(`comp1 OFF: bypass=1, gain=0`);
     }
   } else if (pedalId === 'distortion') {
     if (isActive) {
-      audioNodes.distBypass.gain.setValueAtTime(0, state.audioContext.currentTime);
-      audioNodes.distPostGain.gain.setValueAtTime(mapLevel(state.distortion.level), state.audioContext.currentTime);
+      audioNodes.distBypass.gain.value = 0;
+      audioNodes.distPostGain.gain.value = mapLevel(state.distortion.level);
+      console.log(`distortion ON: bypass=0, gain=${mapLevel(state.distortion.level)}`);
     } else {
-      audioNodes.distBypass.gain.setValueAtTime(1, state.audioContext.currentTime);
-      audioNodes.distPostGain.gain.setValueAtTime(0, state.audioContext.currentTime);
+      audioNodes.distBypass.gain.value = 1;
+      audioNodes.distPostGain.gain.value = 0;
+      console.log(`distortion OFF: bypass=1, gain=0`);
     }
   } else if (pedalId === 'comp2') {
     if (isActive) {
-      audioNodes.comp2Bypass.gain.setValueAtTime(0, state.audioContext.currentTime);
-      audioNodes.comp2Gain.gain.setValueAtTime(mapLevel(state.comp2.level), state.audioContext.currentTime);
+      audioNodes.comp2Bypass.gain.value = 0;
+      audioNodes.comp2Gain.gain.value = mapLevel(state.comp2.level);
+      console.log(`comp2 ON: bypass=0, gain=${mapLevel(state.comp2.level)}`);
     } else {
-      audioNodes.comp2Bypass.gain.setValueAtTime(1, state.audioContext.currentTime);
-      audioNodes.comp2Gain.gain.setValueAtTime(0, state.audioContext.currentTime);
+      audioNodes.comp2Bypass.gain.value = 1;
+      audioNodes.comp2Gain.gain.value = 0;
+      console.log(`comp2 OFF: bypass=1, gain=0`);
     }
   }
 }
@@ -258,7 +289,6 @@ function togglePedal(pedalId) {
   }
 
   updateBypass(pedalId);
-  console.log(`${pedalId} is now ${state[pedalId].active ? 'ON' : 'OFF'}`);
 }
 
 // Setup footswitch interactions
@@ -329,6 +359,8 @@ async function populateInputDevices() {
 
 // Create the audio processing chain
 function createAudioChain(ctx, source) {
+  audioNodes = {};
+
   // === COMPRESSOR 1 ===
   audioNodes.comp1Input = ctx.createGain();
   audioNodes.comp1Compressor = ctx.createDynamicsCompressor();
@@ -336,18 +368,18 @@ function createAudioChain(ctx, source) {
   audioNodes.comp1Bypass = ctx.createGain();
   audioNodes.comp1Output = ctx.createGain();
 
-  // Set initial compressor params
+  // Set compressor params
   audioNodes.comp1Compressor.threshold.value = mapThreshold(state.comp1.threshold);
   audioNodes.comp1Compressor.ratio.value = mapRatio(state.comp1.ratio);
   audioNodes.comp1Compressor.attack.value = mapAttack(state.comp1.attack);
   audioNodes.comp1Compressor.release.value = mapRelease(state.comp1.release);
   audioNodes.comp1Compressor.knee.value = 6;
 
-  // Initial bypass state (bypassed by default)
+  // Initial bypass state (bypassed)
   audioNodes.comp1Gain.gain.value = 0;
   audioNodes.comp1Bypass.gain.value = 1;
 
-  // Connect comp1: input -> [compressor -> gain] + [bypass] -> output
+  // Connect: input -> [compressor -> gain] + [bypass] -> output
   source.connect(audioNodes.comp1Input);
   audioNodes.comp1Input.connect(audioNodes.comp1Compressor);
   audioNodes.comp1Compressor.connect(audioNodes.comp1Gain);
@@ -364,7 +396,7 @@ function createAudioChain(ctx, source) {
   audioNodes.distBypass = ctx.createGain();
   audioNodes.distOutput = ctx.createGain();
 
-  // Set initial distortion params
+  // Set distortion params
   audioNodes.distPreGain.gain.value = mapDrive(state.distortion.drive);
   audioNodes.distWaveshaper.curve = makeDistortionCurve(state.distortion.drive);
   audioNodes.distWaveshaper.oversample = '4x';
@@ -376,7 +408,7 @@ function createAudioChain(ctx, source) {
   audioNodes.distPostGain.gain.value = 0;
   audioNodes.distBypass.gain.value = 1;
 
-  // Connect distortion: input -> [preGain -> waveshaper -> tone -> postGain] + [bypass] -> output
+  // Connect
   audioNodes.comp1Output.connect(audioNodes.distInput);
   audioNodes.distInput.connect(audioNodes.distPreGain);
   audioNodes.distPreGain.connect(audioNodes.distWaveshaper);
@@ -393,7 +425,7 @@ function createAudioChain(ctx, source) {
   audioNodes.comp2Bypass = ctx.createGain();
   audioNodes.comp2Output = ctx.createGain();
 
-  // Set initial compressor params
+  // Set compressor params
   audioNodes.comp2Compressor.threshold.value = mapThreshold(state.comp2.threshold);
   audioNodes.comp2Compressor.ratio.value = mapRatio(state.comp2.ratio);
   audioNodes.comp2Compressor.attack.value = mapAttack(state.comp2.attack);
@@ -404,7 +436,7 @@ function createAudioChain(ctx, source) {
   audioNodes.comp2Gain.gain.value = 0;
   audioNodes.comp2Bypass.gain.value = 1;
 
-  // Connect comp2: input -> [compressor -> gain] + [bypass] -> output
+  // Connect
   audioNodes.distOutput.connect(audioNodes.comp2Input);
   audioNodes.comp2Input.connect(audioNodes.comp2Compressor);
   audioNodes.comp2Compressor.connect(audioNodes.comp2Gain);
@@ -412,13 +444,15 @@ function createAudioChain(ctx, source) {
   audioNodes.comp2Input.connect(audioNodes.comp2Bypass);
   audioNodes.comp2Bypass.connect(audioNodes.comp2Output);
 
-  // Connect final output
+  // Final output
   audioNodes.comp2Output.connect(ctx.destination);
 
-  // Apply current pedal states (in case any were toggled before audio started)
-  updateBypass('comp1');
-  updateBypass('distortion');
-  updateBypass('comp2');
+  console.log('Audio chain created');
+
+  // Apply current pedal states
+  if (state.comp1.active) updateBypass('comp1');
+  if (state.distortion.active) updateBypass('distortion');
+  if (state.comp2.active) updateBypass('comp2');
 }
 
 // Start audio
@@ -428,16 +462,16 @@ async function startAudio() {
     if (state.audioContext) {
       await state.audioContext.close();
       state.audioContext = null;
-      audioNodes = {};
+      audioNodes = null;
     }
     state.audioStarted = false;
     startButton.textContent = 'Start Audio';
     startButton.classList.remove('running');
+    console.log('Audio stopped');
     return;
   }
 
   try {
-    // Create audio context
     state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
     const deviceId = inputSelect.value || undefined;
@@ -453,7 +487,6 @@ async function startAudio() {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     const source = state.audioContext.createMediaStreamSource(stream);
 
-    // Create the full effect chain
     createAudioChain(state.audioContext, source);
 
     state.audioStarted = true;
