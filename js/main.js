@@ -997,10 +997,20 @@ function createAudioChain(ctx, source) {
   audioNodes.ampInput.connect(audioNodes.ampBypass);
   audioNodes.ampBypass.connect(audioNodes.ampOutput);
 
-  // Final output
-  audioNodes.ampOutput.connect(ctx.destination);
+  // === STEREO OUTPUT (dual mono) ===
+  // Use a channel splitter and merger to send mono signal to both L and R
+  audioNodes.stereoSplitter = ctx.createChannelSplitter(2);
+  audioNodes.stereoMerger = ctx.createChannelMerger(2);
 
-  console.log('Audio chain created with amp simulator');
+  // Connect amp output to splitter, then merge channel 0 to both L and R
+  audioNodes.ampOutput.connect(audioNodes.stereoSplitter);
+  audioNodes.stereoSplitter.connect(audioNodes.stereoMerger, 0, 0); // Input ch 0 -> Output L
+  audioNodes.stereoSplitter.connect(audioNodes.stereoMerger, 0, 1); // Input ch 0 -> Output R
+
+  // Final output
+  audioNodes.stereoMerger.connect(ctx.destination);
+
+  console.log('Audio chain created with amp simulator (stereo output)');
 
   // Apply current pedal states
   updateBypass('comp1');
