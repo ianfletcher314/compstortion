@@ -19,7 +19,7 @@ Each stage can be toggled on/off independently via stomp switches.
 ## Phase 1: Project Setup
 
 - [x] Create basic HTML/CSS/JS structure
-- [ ] Set up GitHub Pages deployment
+- [x] Set up GitHub Pages deployment
 - [x] Create responsive layout that works on desktop and mobile
 - [x] Add basic stomp box visual design (metal enclosure, knobs, LED indicators)
 
