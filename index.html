@@ -10,27 +10,6 @@
   <div class="container">
     <h1 class="title">Compstortion</h1>
 
-    <!-- Signal chain visualization -->
-    <div class="signal-chain">
-      <div class="cable-container">
-        <svg class="cable" viewBox="0 0 100 60" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="cableGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" style="stop-color:#444"/>
-              <stop offset="50%" style="stop-color:#222"/>
-              <stop offset="100%" style="stop-color:#333"/>
-            </linearGradient>
-          </defs>
-          <path d="M 0 30 Q 25 50 50 30 T 100 30" stroke="url(#cableGradient)" stroke-width="6" fill="none" stroke-linecap="round"/>
-          <path d="M 0 30 Q 25 50 50 30 T 100 30" stroke="#555" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="0 12"/>
-        </svg>
-        <div class="jack jack-input">
-          <div class="jack-plug"></div>
-        </div>
-      </div>
-      <span class="signal-label">IN</span>
-    </div>
-
     <div class="pedal-board">
       <!-- Compressor 1 -->
       <div class="pedal" id="comp1">
@@ -306,20 +285,6 @@
           <div class="screw"></div>
           <div class="screw"></div>
         </div>
-      </div>
-    </div>
-
-    <!-- Output signal chain -->
-    <div class="signal-chain signal-chain-out">
-      <span class="signal-label">OUT</span>
-      <div class="cable-container">
-        <div class="jack jack-output">
-          <div class="jack-plug"></div>
-        </div>
-        <svg class="cable" viewBox="0 0 100 60" preserveAspectRatio="none">
-          <path d="M 0 30 Q 25 10 50 30 T 100 30" stroke="url(#cableGradient)" stroke-width="6" fill="none" stroke-linecap="round"/>
-          <path d="M 0 30 Q 25 10 50 30 T 100 30" stroke="#555" stroke-width="2" fill="none" stroke-linecap="round" stroke-dasharray="0 12"/>
-        </svg>
       </div>
     </div>
 
