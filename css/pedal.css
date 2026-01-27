@@ -1,5 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Industrial+Gothic&display=swap');
 
+:root {
+  --accent: #00cc66;
+  --accent-dark: #009944;
+  --accent-glow: rgba(0, 204, 102, 0.6);
+  --bg-dark: #0a0a0a;
+  --bg-medium: #1a1a1a;
+  --bg-light: #2a2a2a;
+  --text-light: #e0e0e0;
+  --text-medium: #888;
+  --text-dark: #555;
+  --border-dark: #222;
+  --border-medium: #333;
+  --border-light: #444;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -8,9 +23,9 @@
 
 body {
   font-family: 'Oswald', 'Impact', sans-serif;
-  background: #0a0a0a;
+  background: var(--bg-dark);
   background-image:
-    radial-gradient(ellipse at top, #1a1a1a 0%, #000 70%),
+    radial-gradient(ellipse at top, var(--bg-medium) 0%, #000 70%),
     repeating-linear-gradient(
       0deg,
       transparent,
@@ -26,23 +41,89 @@ body {
 }
 
 .container {
-  max-width: 1200px;
+  max-width: 1400px;
   width: 100%;
 }
 
 .title {
   text-align: center;
-  color: #ff2020;
+  color: var(--accent);
   font-size: 3rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 8px;
-  margin-bottom: 40px;
+  margin-bottom: 30px;
   text-shadow:
-    0 0 10px rgba(255, 32, 32, 0.8),
-    0 0 30px rgba(255, 32, 32, 0.4),
+    0 0 10px var(--accent-glow),
+    0 0 30px rgba(0, 204, 102, 0.3),
     2px 2px 0 #000;
   font-family: 'Oswald', 'Impact', sans-serif;
+}
+
+/* Signal Chain / Cable Visualization */
+.signal-chain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  gap: 10px;
+}
+
+.signal-chain-out {
+  margin-top: 20px;
+  margin-bottom: 0;
+}
+
+.signal-label {
+  color: var(--text-dark);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.cable-container {
+  display: flex;
+  align-items: center;
+  width: 120px;
+  height: 40px;
+  position: relative;
+}
+
+.cable {
+  width: 100%;
+  height: 100%;
+}
+
+.jack {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(145deg, #555 0%, #222 100%);
+  border-radius: 50%;
+  border: 2px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.jack-plug {
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(145deg, #666 0%, #333 100%);
+  border-radius: 50%;
+  border: 1px solid #555;
+}
+
+.jack-input {
+  margin-right: -12px;
+  z-index: 1;
+}
+
+.jack-output {
+  margin-left: -12px;
+  z-index: 1;
 }
 
 /* Pedal Board */
@@ -59,7 +140,7 @@ body {
   width: 210px;
   background:
     linear-gradient(135deg,
-      rgba(60, 60, 60, 1) 0%,
+      rgba(50, 50, 50, 1) 0%,
       rgba(30, 30, 30, 1) 50%,
       rgba(20, 20, 20, 1) 100%
     );
@@ -70,7 +151,7 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     inset 0 -1px 0 rgba(0, 0, 0, 0.5);
   position: relative;
-  border: 1px solid #222;
+  border: 1px solid var(--border-dark);
   display: flex;
   flex-direction: column;
 }
@@ -94,22 +175,18 @@ body {
   border-radius: 4px;
 }
 
-#comp1 {
+/* All pedals use consistent dark grey with subtle green tint */
+#comp1,
+#distortion,
+#comp2,
+#amp {
   background:
-    linear-gradient(180deg, #1a2a1a 0%, #0f1a0f 50%, #050a05 100%);
-  border-color: #1a3a1a;
+    linear-gradient(180deg, #1a1f1a 0%, #121512 50%, #0a0c0a 100%);
+  border-color: #1a2a1a;
 }
 
-#distortion {
-  background:
-    linear-gradient(180deg, #2a1010 0%, #1a0808 50%, #0a0404 100%);
-  border-color: #3a1a1a;
-}
-
-#comp2 {
-  background:
-    linear-gradient(180deg, #10102a 0%, #08081a 50%, #04040a 100%);
-  border-color: #1a1a3a;
+.amp-pedal {
+  width: 220px;
 }
 
 .pedal-top,
@@ -156,7 +233,7 @@ body {
 /* Pedal Name */
 .pedal-name {
   text-align: center;
-  color: #ddd;
+  color: var(--text-light);
   font-size: 0.9rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -176,24 +253,24 @@ body {
 .led {
   width: 10px;
   height: 10px;
-  background: #200;
+  background: #0a1a0a;
   border-radius: 50%;
-  border: 1px solid #333;
+  border: 1px solid var(--border-medium);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
   transition: all 0.05s ease;
 }
 
 .led.active {
-  background: radial-gradient(circle at 30% 30%, #ff6666 0%, #ff0000 50%, #cc0000 100%);
+  background: radial-gradient(circle at 30% 30%, #66ff99 0%, #00cc66 50%, #009944 100%);
   box-shadow:
-    0 0 8px #ff0000,
-    0 0 16px #ff0000,
-    0 0 32px rgba(255, 0, 0, 0.5),
+    0 0 8px var(--accent),
+    0 0 16px var(--accent),
+    0 0 32px var(--accent-glow),
     inset 0 -2px 4px rgba(0, 0, 0, 0.3);
-  border-color: #ff4444;
+  border-color: var(--accent);
 }
 
-/* Distortion Type Selector */
+/* Type Selector (Distortion & Amp) */
 .type-selector {
   display: flex;
   flex-direction: column;
@@ -202,8 +279,8 @@ body {
   cursor: pointer;
   user-select: none;
   padding: 6px 12px;
-  background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
-  border: 1px solid #333;
+  background: linear-gradient(180deg, var(--bg-medium) 0%, var(--bg-dark) 100%);
+  border: 1px solid var(--border-medium);
   border-radius: 3px;
   box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.8),
@@ -212,18 +289,18 @@ body {
 }
 
 .type-selector:hover {
-  border-color: #ff4444;
+  border-color: var(--accent);
   box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.8),
-    0 0 8px rgba(255, 68, 68, 0.3);
+    0 0 8px var(--accent-glow);
 }
 
 .type-selector:active {
-  background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+  background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-medium) 100%);
 }
 
 .type-label {
-  color: #555;
+  color: var(--text-dark);
   font-size: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -231,19 +308,19 @@ body {
 }
 
 .type-display {
-  color: #ff4444;
+  color: var(--accent);
   font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
   font-family: 'Oswald', 'Impact', sans-serif;
-  text-shadow: 0 0 8px rgba(255, 68, 68, 0.6);
+  text-shadow: 0 0 8px var(--accent-glow);
   min-width: 60px;
   text-align: center;
 }
 
 .type-arrows {
-  color: #444;
+  color: var(--border-light);
   font-size: 0.6rem;
   letter-spacing: 4px;
 }
@@ -261,6 +338,12 @@ body {
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   min-height: 60px;
+}
+
+.knobs.knobs-4 {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  min-height: 100px;
 }
 
 .knobs.knobs-5 {
@@ -291,7 +374,7 @@ body {
 }
 
 .knob-group label {
-  color: #888;
+  color: var(--text-medium);
   font-size: 0.55rem;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -314,7 +397,7 @@ body {
   align-items: center;
   justify-content: center;
   user-select: none;
-  border: 1px solid #333;
+  border: 1px solid var(--border-medium);
 }
 
 .knob-inner {
@@ -328,7 +411,7 @@ body {
     inset 0 2px 4px rgba(0, 0, 0, 0.4),
     inset 0 -1px 2px rgba(255, 255, 255, 0.05);
   transition: transform 0.02s linear;
-  border: 1px solid #222;
+  border: 1px solid var(--border-dark);
 }
 
 /* Knurled edge effect */
@@ -351,12 +434,12 @@ body {
   position: absolute;
   width: 2px;
   height: 8px;
-  background: #ff3333;
+  background: var(--accent);
   top: 3px;
   left: 50%;
   transform: translateX(-50%);
   border-radius: 1px;
-  box-shadow: 0 0 4px rgba(255, 50, 50, 0.8);
+  box-shadow: 0 0 4px var(--accent-glow);
 }
 
 /* Footswitch */
@@ -372,7 +455,7 @@ body {
   height: 54px;
   background:
     radial-gradient(ellipse at 30% 30%, #555 0%, #2a2a2a 50%, #1a1a1a 100%);
-  border: 2px solid #444;
+  border: 2px solid var(--border-light);
   border-radius: 50%;
   cursor: pointer;
   box-shadow:
@@ -444,53 +527,56 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 3px;
-  background: linear-gradient(180deg, #cc0000 0%, #880000 100%);
-  color: #fff;
-  border: 1px solid #ff0000;
+  background: linear-gradient(180deg, #444 0%, #222 100%);
+  color: var(--text-light);
+  border: 1px solid var(--border-light);
   border-radius: 2px;
   cursor: pointer;
   box-shadow:
-    0 4px 16px rgba(255, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: all 0.1s ease;
   font-family: 'Oswald', sans-serif;
 }
 
 .start-button:hover {
-  background: linear-gradient(180deg, #ee0000 0%, #aa0000 100%);
+  background: linear-gradient(180deg, #555 0%, #333 100%);
+  border-color: var(--accent);
   box-shadow:
-    0 4px 24px rgba(255, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 4px 24px rgba(0, 0, 0, 0.5),
+    0 0 8px var(--accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .start-button:active {
   transform: translateY(2px);
   box-shadow:
-    0 2px 8px rgba(255, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.5),
     inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .start-button.running {
-  background: linear-gradient(180deg, #00aa00 0%, #006600 100%);
-  border-color: #00ff00;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
+  border-color: var(--accent);
+  color: #000;
   box-shadow:
-    0 4px 16px rgba(0, 255, 0, 0.3),
+    0 4px 16px var(--accent-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .start-button.running:hover {
-  background: linear-gradient(180deg, #00cc00 0%, #008800 100%);
+  background: linear-gradient(180deg, #00dd77 0%, var(--accent) 100%);
   box-shadow:
-    0 4px 24px rgba(0, 255, 0, 0.5),
+    0 4px 24px var(--accent-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .input-select {
   padding: 14px 20px;
   font-size: 0.8rem;
-  background: #1a1a1a;
-  color: #aaa;
-  border: 1px solid #333;
+  background: var(--bg-medium);
+  color: var(--text-medium);
+  border: 1px solid var(--border-medium);
   border-radius: 2px;
   cursor: pointer;
   min-width: 200px;
@@ -500,7 +586,7 @@ body {
 
 .input-select:focus {
   outline: none;
-  border-color: #ff0000;
+  border-color: var(--accent);
 }
 
 .input-select:disabled {
@@ -512,13 +598,25 @@ body {
 .instructions {
   text-align: center;
   margin-top: 25px;
-  color: #444;
+  color: var(--text-dark);
   font-size: 0.75rem;
   letter-spacing: 1px;
   text-transform: uppercase;
 }
 
 /* Responsive */
+@media (max-width: 900px) {
+  .pedal-board {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .pedal {
+    width: 180px;
+  }
+}
+
 @media (max-width: 700px) {
   .pedal-board {
     flex-direction: column;
@@ -526,6 +624,11 @@ body {
   }
 
   .pedal {
+    width: 100%;
+    max-width: 260px;
+  }
+
+  .amp-pedal {
     width: 100%;
     max-width: 260px;
   }
@@ -541,6 +644,10 @@ body {
   .title {
     font-size: 2rem;
     letter-spacing: 4px;
+  }
+
+  .signal-chain {
+    display: none;
   }
 }
 

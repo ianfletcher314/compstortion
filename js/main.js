@@ -7,11 +7,21 @@ const DISTORTION_TYPES = [
   { id: 'muff', name: 'MUFF', description: 'Big Muff - sustaining fuzz' },
 ];
 
+// Amp types simulating famous amps
+const AMP_TYPES = [
+  { id: 'clean', name: 'CLEAN', description: 'Fender-style clean with sparkle' },
+  { id: 'crunch', name: 'CRUNCH', description: 'Marshall-style edge of breakup' },
+  { id: 'lead', name: 'LEAD', description: 'High-gain lead tone' },
+  { id: 'modern', name: 'MODERN', description: 'Mesa-style tight high-gain' },
+  { id: 'vintage', name: 'VINTAGE', description: 'Vox-style chimey breakup' },
+];
+
 // Pedal state
 const state = {
   comp1: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
   distortion: { active: false, drive: 0.5, tone: 0.5, level: 0.5, type: 0 },
   comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
+  amp: { active: true, bass: 0.5, mid: 0.5, treble: 0.5, gain: 0.3, type: 0 },
   audioStarted: false,
   audioContext: null,
 };
@@ -84,6 +94,42 @@ function mapTone(value, typeIndex = 0) {
   }
 }
 
+// Amp EQ mapping functions
+function mapAmpBass(value) {
+  // 0-1 -> -12 to +12 dB
+  return (value - 0.5) * 24;
+}
+
+function mapAmpMid(value) {
+  // 0-1 -> -12 to +12 dB
+  return (value - 0.5) * 24;
+}
+
+function mapAmpTreble(value) {
+  // 0-1 -> -12 to +12 dB
+  return (value - 0.5) * 24;
+}
+
+function mapAmpGain(value, typeIndex = 0) {
+  const type = AMP_TYPES[typeIndex]?.id || 'clean';
+
+  // Different amps have different gain ranges
+  switch (type) {
+    case 'clean':
+      return 1 + (value * 3); // 1-4x
+    case 'crunch':
+      return 2 + (value * 8); // 2-10x
+    case 'lead':
+      return 4 + (value * 16); // 4-20x
+    case 'modern':
+      return 5 + (value * 20); // 5-25x
+    case 'vintage':
+      return 1.5 + (value * 6); // 1.5-7.5x
+    default:
+      return 1 + (value * 10);
+  }
+}
+
 // Update tone filter Q and characteristics based on pedal type
 function updateToneFilterForType(typeIndex) {
   if (!audioNodes || !audioNodes.distToneFilter) return;
@@ -142,6 +188,87 @@ function makeDistortionCurve(amount, typeIndex) {
   }
 
   return curve;
+}
+
+// Create amp saturation curve based on amp type
+function makeAmpCurve(gain, typeIndex) {
+  const samples = 44100;
+  const curve = new Float32Array(samples);
+  const type = AMP_TYPES[typeIndex]?.id || 'clean';
+
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1;
+    curve[i] = applyAmpAlgorithm(x, gain, type);
+  }
+
+  // Normalize
+  let maxVal = 0;
+  for (let i = 0; i < samples; i++) {
+    maxVal = Math.max(maxVal, Math.abs(curve[i]));
+  }
+  if (maxVal > 0) {
+    for (let i = 0; i < samples; i++) {
+      curve[i] /= maxVal;
+    }
+  }
+
+  return curve;
+}
+
+// Different amp saturation algorithms
+function applyAmpAlgorithm(x, gain, type) {
+  const k = gain;
+
+  switch (type) {
+    case 'clean':
+      // Fender-style: Very soft saturation, mostly clean with subtle warmth
+      // Only clips on peaks, maintains dynamics
+      const cleanSignal = k * x;
+      if (Math.abs(cleanSignal) < 0.8) {
+        return cleanSignal;
+      }
+      // Gentle soft clip
+      return Math.sign(cleanSignal) * (0.8 + 0.2 * Math.tanh((Math.abs(cleanSignal) - 0.8) * 3));
+
+    case 'crunch':
+      // Marshall-style: Asymmetric tube saturation, more breakup
+      const crunchSignal = k * x;
+      if (crunchSignal >= 0) {
+        return Math.tanh(crunchSignal * 1.2);
+      } else {
+        // Asymmetric - negative clips a bit harder
+        return Math.tanh(crunchSignal * 1.5) * 0.9;
+      }
+
+    case 'lead':
+      // High-gain lead: More saturation, sustain, compression
+      const leadSignal = k * x;
+      // Double-stage saturation for more gain
+      const stage1 = Math.tanh(leadSignal * 0.8);
+      return Math.tanh(stage1 * 2);
+
+    case 'modern':
+      // Mesa-style: Tight, aggressive, focused
+      const modernSignal = k * x;
+      // Hard clipping with some softness
+      const clipped = Math.max(-1, Math.min(1, modernSignal * 1.5));
+      // Add some soft saturation character
+      return clipped * 0.7 + Math.tanh(modernSignal) * 0.3;
+
+    case 'vintage':
+      // Vox-style: Chimey, jangly, class-A character
+      const vintageSignal = k * x;
+      // Asymmetric with more even harmonics
+      if (vintageSignal >= 0) {
+        return Math.tanh(vintageSignal);
+      } else {
+        // More compression on negative swing
+        return Math.tanh(vintageSignal * 0.7) * 1.1;
+      }
+
+    default:
+      return Math.tanh(k * x);
+  }
 }
 
 // Different distortion algorithms
@@ -238,6 +365,16 @@ function updateTypeDisplay() {
   }
 }
 
+// Update amp type display
+function updateAmpTypeDisplay() {
+  const typeDisplay = document.getElementById('amp-type-display');
+  if (typeDisplay) {
+    const currentType = AMP_TYPES[state.amp.type];
+    typeDisplay.textContent = currentType.name;
+    typeDisplay.title = currentType.description;
+  }
+}
+
 // Cycle to next distortion type
 function cycleDistortionType(direction = 1) {
   state.distortion.type = (state.distortion.type + direction + DISTORTION_TYPES.length) % DISTORTION_TYPES.length;
@@ -246,25 +383,54 @@ function cycleDistortionType(direction = 1) {
   console.log(`Distortion type: ${DISTORTION_TYPES[state.distortion.type].name}`);
 }
 
+// Cycle to next amp type
+function cycleAmpType(direction = 1) {
+  state.amp.type = (state.amp.type + direction + AMP_TYPES.length) % AMP_TYPES.length;
+  updateAmpTypeDisplay();
+  updateAudioParams('amp', 'type');
+  console.log(`Amp type: ${AMP_TYPES[state.amp.type].name}`);
+}
+
 // Setup distortion type selector
 function setupTypeSelector() {
   const typeSelector = document.getElementById('distortion-type-selector');
-  if (!typeSelector) return;
+  if (typeSelector) {
+    // Click cycles forward
+    typeSelector.addEventListener('click', (e) => {
+      e.preventDefault();
+      cycleDistortionType(1);
+    });
 
-  // Click cycles forward
-  typeSelector.addEventListener('click', (e) => {
-    e.preventDefault();
-    cycleDistortionType(1);
-  });
-
-  // Right-click cycles backward
-  typeSelector.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    cycleDistortionType(-1);
-  });
+    // Right-click cycles backward
+    typeSelector.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      cycleDistortionType(-1);
+    });
+  }
 
   // Initialize display
   updateTypeDisplay();
+}
+
+// Setup amp type selector
+function setupAmpTypeSelector() {
+  const typeSelector = document.getElementById('amp-type-selector');
+  if (typeSelector) {
+    // Click cycles forward
+    typeSelector.addEventListener('click', (e) => {
+      e.preventDefault();
+      cycleAmpType(1);
+    });
+
+    // Right-click cycles backward
+    typeSelector.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      cycleAmpType(-1);
+    });
+  }
+
+  // Initialize display
+  updateAmpTypeDisplay();
 }
 
 // Update knob visual rotation (value 0-1 maps to -135 to +135 degrees)
@@ -274,6 +440,66 @@ function updateKnobRotation(knob, value) {
   if (inner) {
     inner.style.transform = `rotate(${rotation}deg)`;
   }
+}
+
+// Update amp EQ filters based on amp type
+function updateAmpEQForType(typeIndex) {
+  if (!audioNodes) return;
+
+  const type = AMP_TYPES[typeIndex]?.id || 'clean';
+
+  // Set EQ characteristics based on amp type
+  switch (type) {
+    case 'clean':
+      // Fender: Scooped mids, bright
+      audioNodes.ampBassFilter.frequency.value = 100;
+      audioNodes.ampMidFilter.frequency.value = 800;
+      audioNodes.ampTrebleFilter.frequency.value = 3000;
+      audioNodes.ampBassFilter.Q.value = 0.7;
+      audioNodes.ampMidFilter.Q.value = 0.8;
+      audioNodes.ampTrebleFilter.Q.value = 0.7;
+      break;
+    case 'crunch':
+      // Marshall: Mid-focused
+      audioNodes.ampBassFilter.frequency.value = 80;
+      audioNodes.ampMidFilter.frequency.value = 650;
+      audioNodes.ampTrebleFilter.frequency.value = 3500;
+      audioNodes.ampBassFilter.Q.value = 0.8;
+      audioNodes.ampMidFilter.Q.value = 1.2;
+      audioNodes.ampTrebleFilter.Q.value = 0.8;
+      break;
+    case 'lead':
+      // High-gain lead
+      audioNodes.ampBassFilter.frequency.value = 90;
+      audioNodes.ampMidFilter.frequency.value = 700;
+      audioNodes.ampTrebleFilter.frequency.value = 4000;
+      audioNodes.ampBassFilter.Q.value = 1.0;
+      audioNodes.ampMidFilter.Q.value = 1.0;
+      audioNodes.ampTrebleFilter.Q.value = 0.9;
+      break;
+    case 'modern':
+      // Mesa: Tight bass, scooped mids
+      audioNodes.ampBassFilter.frequency.value = 120;
+      audioNodes.ampMidFilter.frequency.value = 500;
+      audioNodes.ampTrebleFilter.frequency.value = 5000;
+      audioNodes.ampBassFilter.Q.value = 1.2;
+      audioNodes.ampMidFilter.Q.value = 0.6;
+      audioNodes.ampTrebleFilter.Q.value = 1.0;
+      break;
+    case 'vintage':
+      // Vox: Chimey, mid-forward
+      audioNodes.ampBassFilter.frequency.value = 100;
+      audioNodes.ampMidFilter.frequency.value = 1000;
+      audioNodes.ampTrebleFilter.frequency.value = 2500;
+      audioNodes.ampBassFilter.Q.value = 0.6;
+      audioNodes.ampMidFilter.Q.value = 1.5;
+      audioNodes.ampTrebleFilter.Q.value = 0.6;
+      break;
+  }
+
+  // Update the waveshaper curve
+  const gain = mapAmpGain(state.amp.gain, typeIndex);
+  audioNodes.ampWaveshaper.curve = makeAmpCurve(gain, typeIndex);
 }
 
 // Update audio parameters based on current state
@@ -354,6 +580,26 @@ function updateAudioParams(pedal, param) {
           audioNodes.comp2Gain.gain.value = mapLevel(state.comp2.level) * value;
           audioNodes.comp2Dry.gain.value = mapLevel(state.comp2.level) * (1 - value);
         }
+        break;
+    }
+  } else if (pedal === 'amp' && audioNodes.ampWaveshaper) {
+    switch (param) {
+      case 'bass':
+        audioNodes.ampBassFilter.gain.value = mapAmpBass(value);
+        break;
+      case 'mid':
+        audioNodes.ampMidFilter.gain.value = mapAmpMid(value);
+        break;
+      case 'treble':
+        audioNodes.ampTrebleFilter.gain.value = mapAmpTreble(value);
+        break;
+      case 'gain':
+        const gain = mapAmpGain(value, state.amp.type);
+        audioNodes.ampPreGain.gain.value = gain;
+        audioNodes.ampWaveshaper.curve = makeAmpCurve(gain, state.amp.type);
+        break;
+      case 'type':
+        updateAmpEQForType(value);
         break;
     }
   }
@@ -480,6 +726,16 @@ function updateBypass(pedalId) {
       audioNodes.comp2Dry.gain.value = 0;
       console.log(`comp2 OFF: bypass=1, wet=0, dry=0`);
     }
+  } else if (pedalId === 'amp') {
+    if (isActive) {
+      audioNodes.ampBypass.gain.value = 0;
+      audioNodes.ampPostGain.gain.value = 0.7; // Master output level
+      console.log(`amp ON: bypass=0`);
+    } else {
+      audioNodes.ampBypass.gain.value = 1;
+      audioNodes.ampPostGain.gain.value = 0;
+      console.log(`amp OFF: bypass=1`);
+    }
   }
 }
 
@@ -511,7 +767,7 @@ function setupFootswitches() {
   });
 }
 
-// Keyboard shortcuts (1, 2, 3 for each pedal, D for distortion type)
+// Keyboard shortcuts (1, 2, 3, 4 for each pedal, D for distortion type, A for amp type)
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
@@ -529,9 +785,17 @@ function setupKeyboardShortcuts() {
         togglePedal('comp2');
         animateFootswitch('comp2');
         break;
+      case '4':
+        togglePedal('amp');
+        animateFootswitch('amp');
+        break;
       case 'd':
         // Cycle distortion type (shift+d for reverse)
         cycleDistortionType(e.shiftKey ? -1 : 1);
+        break;
+      case 'a':
+        // Cycle amp type (shift+a for reverse)
+        cycleAmpType(e.shiftKey ? -1 : 1);
         break;
     }
   });
@@ -539,8 +803,10 @@ function setupKeyboardShortcuts() {
 
 function animateFootswitch(pedalId) {
   const footswitch = document.querySelector(`.footswitch[data-pedal="${pedalId}"]`);
-  footswitch.classList.add('pressed');
-  setTimeout(() => footswitch.classList.remove('pressed'), 100);
+  if (footswitch) {
+    footswitch.classList.add('pressed');
+    setTimeout(() => footswitch.classList.remove('pressed'), 100);
+  }
 }
 
 // Populate audio input devices
@@ -662,15 +928,91 @@ function createAudioChain(ctx, source) {
   audioNodes.comp2Input.connect(audioNodes.comp2Bypass);     // Full bypass path
   audioNodes.comp2Bypass.connect(audioNodes.comp2Output);
 
-  // Final output
-  audioNodes.comp2Output.connect(ctx.destination);
+  // === AMP SIMULATOR ===
+  audioNodes.ampInput = ctx.createGain();
+  audioNodes.ampPreGain = ctx.createGain();
+  audioNodes.ampWaveshaper = ctx.createWaveShaper();
 
-  console.log('Audio chain created');
+  // Cabinet simulation using EQ
+  audioNodes.ampBassFilter = ctx.createBiquadFilter();
+  audioNodes.ampMidFilter = ctx.createBiquadFilter();
+  audioNodes.ampTrebleFilter = ctx.createBiquadFilter();
+
+  // High-cut filter to simulate speaker rolloff
+  audioNodes.ampCabFilter = ctx.createBiquadFilter();
+  // Low-cut to remove mud
+  audioNodes.ampHighpassFilter = ctx.createBiquadFilter();
+
+  audioNodes.ampPostGain = ctx.createGain();
+  audioNodes.ampBypass = ctx.createGain();
+  audioNodes.ampOutput = ctx.createGain();
+
+  // Set amp params
+  const ampGain = mapAmpGain(state.amp.gain, state.amp.type);
+  audioNodes.ampPreGain.gain.value = ampGain;
+  audioNodes.ampWaveshaper.curve = makeAmpCurve(ampGain, state.amp.type);
+  audioNodes.ampWaveshaper.oversample = '4x';
+
+  // Bass EQ (low shelf)
+  audioNodes.ampBassFilter.type = 'lowshelf';
+  audioNodes.ampBassFilter.frequency.value = 100;
+  audioNodes.ampBassFilter.gain.value = mapAmpBass(state.amp.bass);
+
+  // Mid EQ (peaking)
+  audioNodes.ampMidFilter.type = 'peaking';
+  audioNodes.ampMidFilter.frequency.value = 800;
+  audioNodes.ampMidFilter.Q.value = 1.0;
+  audioNodes.ampMidFilter.gain.value = mapAmpMid(state.amp.mid);
+
+  // Treble EQ (high shelf)
+  audioNodes.ampTrebleFilter.type = 'highshelf';
+  audioNodes.ampTrebleFilter.frequency.value = 3000;
+  audioNodes.ampTrebleFilter.gain.value = mapAmpTreble(state.amp.treble);
+
+  // Cabinet simulation - high cut (speaker rolloff around 5-6kHz)
+  audioNodes.ampCabFilter.type = 'lowpass';
+  audioNodes.ampCabFilter.frequency.value = 5500;
+  audioNodes.ampCabFilter.Q.value = 0.7;
+
+  // High-pass to remove rumble (typical cab doesn't reproduce below ~80Hz well)
+  audioNodes.ampHighpassFilter.type = 'highpass';
+  audioNodes.ampHighpassFilter.frequency.value = 80;
+  audioNodes.ampHighpassFilter.Q.value = 0.7;
+
+  // Initial state - amp ON by default
+  audioNodes.ampPostGain.gain.value = 0.7;
+  audioNodes.ampBypass.gain.value = 0;
+
+  // Connect amp chain
+  audioNodes.comp2Output.connect(audioNodes.ampInput);
+  audioNodes.ampInput.connect(audioNodes.ampPreGain);
+  audioNodes.ampPreGain.connect(audioNodes.ampWaveshaper);
+  audioNodes.ampWaveshaper.connect(audioNodes.ampBassFilter);
+  audioNodes.ampBassFilter.connect(audioNodes.ampMidFilter);
+  audioNodes.ampMidFilter.connect(audioNodes.ampTrebleFilter);
+  audioNodes.ampTrebleFilter.connect(audioNodes.ampHighpassFilter);
+  audioNodes.ampHighpassFilter.connect(audioNodes.ampCabFilter);
+  audioNodes.ampCabFilter.connect(audioNodes.ampPostGain);
+  audioNodes.ampPostGain.connect(audioNodes.ampOutput);
+  audioNodes.ampInput.connect(audioNodes.ampBypass);
+  audioNodes.ampBypass.connect(audioNodes.ampOutput);
+
+  // Final output
+  audioNodes.ampOutput.connect(ctx.destination);
+
+  console.log('Audio chain created with amp simulator');
 
   // Apply current pedal states
-  if (state.comp1.active) updateBypass('comp1');
-  if (state.distortion.active) updateBypass('distortion');
-  if (state.comp2.active) updateBypass('comp2');
+  updateBypass('comp1');
+  updateBypass('distortion');
+  updateBypass('comp2');
+  updateBypass('amp');
+
+  // Initialize amp LED state
+  const ampLed = document.getElementById('led-amp');
+  if (ampLed && state.amp.active) {
+    ampLed.classList.add('active');
+  }
 }
 
 // Start audio
@@ -725,11 +1067,18 @@ function init() {
   setupFootswitches();
   setupKeyboardShortcuts();
   setupTypeSelector();
+  setupAmpTypeSelector();
   populateInputDevices();
 
   startButton.addEventListener('click', startAudio);
 
-  console.log('Compstortion initialized');
+  // Initialize amp LED to active state
+  const ampLed = document.getElementById('led-amp');
+  if (ampLed && state.amp.active) {
+    ampLed.classList.add('active');
+  }
+
+  console.log('Compstortion initialized with amp simulator');
 }
 
 document.addEventListener('DOMContentLoaded', init);
