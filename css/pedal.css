@@ -278,6 +278,11 @@ body {
   justify-self: center;
 }
 
+.knobs.knobs-6 {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
 .knob-group {
   display: flex;
   flex-direction: column;

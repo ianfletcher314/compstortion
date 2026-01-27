@@ -9,9 +9,9 @@ const DISTORTION_TYPES = [
 
 // Pedal state
 const state = {
-  comp1: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5 },
+  comp1: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
   distortion: { active: false, drive: 0.5, tone: 0.5, level: 0.5, type: 0 },
-  comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5 },
+  comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
   audioStarted: false,
   audioContext: null,
 };
@@ -302,6 +302,13 @@ function updateAudioParams(pedal, param) {
           audioNodes.comp1Gain.gain.value = mapLevel(value);
         }
         break;
+      case 'blend':
+        if (state.comp1.active) {
+          // Blend: 1 = 100% wet (compressed), 0 = 100% dry
+          audioNodes.comp1Gain.gain.value = mapLevel(state.comp1.level) * value;
+          audioNodes.comp1Dry.gain.value = mapLevel(state.comp1.level) * (1 - value);
+        }
+        break;
     }
   } else if (pedal === 'distortion' && audioNodes.distWaveshaper) {
     switch (param) {
@@ -339,6 +346,13 @@ function updateAudioParams(pedal, param) {
       case 'level':
         if (state.comp2.active) {
           audioNodes.comp2Gain.gain.value = mapLevel(value);
+        }
+        break;
+      case 'blend':
+        if (state.comp2.active) {
+          // Blend: 1 = 100% wet (compressed), 0 = 100% dry
+          audioNodes.comp2Gain.gain.value = mapLevel(state.comp2.level) * value;
+          audioNodes.comp2Dry.gain.value = mapLevel(state.comp2.level) * (1 - value);
         }
         break;
     }
@@ -427,15 +441,19 @@ function updateBypass(pedalId) {
 
   if (pedalId === 'comp1') {
     if (isActive) {
-      // Enable effect: mute bypass, unmute effect chain
+      // Enable effect: mute bypass, set wet/dry based on blend
+      const wetLevel = mapLevel(state.comp1.level) * state.comp1.blend;
+      const dryLevel = mapLevel(state.comp1.level) * (1 - state.comp1.blend);
       audioNodes.comp1Bypass.gain.value = 0;
-      audioNodes.comp1Gain.gain.value = mapLevel(state.comp1.level);
-      console.log(`comp1 ON: bypass=0, gain=${mapLevel(state.comp1.level)}`);
+      audioNodes.comp1Gain.gain.value = wetLevel;
+      audioNodes.comp1Dry.gain.value = dryLevel;
+      console.log(`comp1 ON: bypass=0, wet=${wetLevel}, dry=${dryLevel}`);
     } else {
       // Bypass: mute effect chain, unmute bypass
       audioNodes.comp1Bypass.gain.value = 1;
       audioNodes.comp1Gain.gain.value = 0;
-      console.log(`comp1 OFF: bypass=1, gain=0`);
+      audioNodes.comp1Dry.gain.value = 0;
+      console.log(`comp1 OFF: bypass=1, wet=0, dry=0`);
     }
   } else if (pedalId === 'distortion') {
     if (isActive) {
@@ -449,13 +467,18 @@ function updateBypass(pedalId) {
     }
   } else if (pedalId === 'comp2') {
     if (isActive) {
+      // Enable effect: mute bypass, set wet/dry based on blend
+      const wetLevel = mapLevel(state.comp2.level) * state.comp2.blend;
+      const dryLevel = mapLevel(state.comp2.level) * (1 - state.comp2.blend);
       audioNodes.comp2Bypass.gain.value = 0;
-      audioNodes.comp2Gain.gain.value = mapLevel(state.comp2.level);
-      console.log(`comp2 ON: bypass=0, gain=${mapLevel(state.comp2.level)}`);
+      audioNodes.comp2Gain.gain.value = wetLevel;
+      audioNodes.comp2Dry.gain.value = dryLevel;
+      console.log(`comp2 ON: bypass=0, wet=${wetLevel}, dry=${dryLevel}`);
     } else {
       audioNodes.comp2Bypass.gain.value = 1;
       audioNodes.comp2Gain.gain.value = 0;
-      console.log(`comp2 OFF: bypass=1, gain=0`);
+      audioNodes.comp2Dry.gain.value = 0;
+      console.log(`comp2 OFF: bypass=1, wet=0, dry=0`);
     }
   }
 }
@@ -551,8 +574,9 @@ function createAudioChain(ctx, source) {
   // === COMPRESSOR 1 ===
   audioNodes.comp1Input = ctx.createGain();
   audioNodes.comp1Compressor = ctx.createDynamicsCompressor();
-  audioNodes.comp1Gain = ctx.createGain();
-  audioNodes.comp1Bypass = ctx.createGain();
+  audioNodes.comp1Gain = ctx.createGain();      // Wet (compressed) signal
+  audioNodes.comp1Dry = ctx.createGain();       // Dry (uncompressed) signal for blend
+  audioNodes.comp1Bypass = ctx.createGain();    // Full bypass when pedal is off
   audioNodes.comp1Output = ctx.createGain();
 
   // Set compressor params
@@ -564,14 +588,17 @@ function createAudioChain(ctx, source) {
 
   // Initial bypass state (bypassed)
   audioNodes.comp1Gain.gain.value = 0;
+  audioNodes.comp1Dry.gain.value = 0;
   audioNodes.comp1Bypass.gain.value = 1;
 
-  // Connect: input -> [compressor -> gain] + [bypass] -> output
+  // Connect: input -> [compressor -> wetGain] + [dryGain] + [bypass] -> output
   source.connect(audioNodes.comp1Input);
   audioNodes.comp1Input.connect(audioNodes.comp1Compressor);
   audioNodes.comp1Compressor.connect(audioNodes.comp1Gain);
   audioNodes.comp1Gain.connect(audioNodes.comp1Output);
-  audioNodes.comp1Input.connect(audioNodes.comp1Bypass);
+  audioNodes.comp1Input.connect(audioNodes.comp1Dry);        // Dry path for blend
+  audioNodes.comp1Dry.connect(audioNodes.comp1Output);
+  audioNodes.comp1Input.connect(audioNodes.comp1Bypass);     // Full bypass path
   audioNodes.comp1Bypass.connect(audioNodes.comp1Output);
 
   // === DISTORTION ===
@@ -608,8 +635,9 @@ function createAudioChain(ctx, source) {
   // === COMPRESSOR 2 ===
   audioNodes.comp2Input = ctx.createGain();
   audioNodes.comp2Compressor = ctx.createDynamicsCompressor();
-  audioNodes.comp2Gain = ctx.createGain();
-  audioNodes.comp2Bypass = ctx.createGain();
+  audioNodes.comp2Gain = ctx.createGain();      // Wet (compressed) signal
+  audioNodes.comp2Dry = ctx.createGain();       // Dry (uncompressed) signal for blend
+  audioNodes.comp2Bypass = ctx.createGain();    // Full bypass when pedal is off
   audioNodes.comp2Output = ctx.createGain();
 
   // Set compressor params
@@ -621,14 +649,17 @@ function createAudioChain(ctx, source) {
 
   // Initial bypass state
   audioNodes.comp2Gain.gain.value = 0;
+  audioNodes.comp2Dry.gain.value = 0;
   audioNodes.comp2Bypass.gain.value = 1;
 
-  // Connect
+  // Connect: input -> [compressor -> wetGain] + [dryGain] + [bypass] -> output
   audioNodes.distOutput.connect(audioNodes.comp2Input);
   audioNodes.comp2Input.connect(audioNodes.comp2Compressor);
   audioNodes.comp2Compressor.connect(audioNodes.comp2Gain);
   audioNodes.comp2Gain.connect(audioNodes.comp2Output);
-  audioNodes.comp2Input.connect(audioNodes.comp2Bypass);
+  audioNodes.comp2Input.connect(audioNodes.comp2Dry);        // Dry path for blend
+  audioNodes.comp2Dry.connect(audioNodes.comp2Output);
+  audioNodes.comp2Input.connect(audioNodes.comp2Bypass);     // Full bypass path
   audioNodes.comp2Bypass.connect(audioNodes.comp2Output);
 
   // Final output
