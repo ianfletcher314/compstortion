@@ -809,7 +809,7 @@ function animateFootswitch(pedalId) {
   }
 }
 
-// Populate audio input devices
+// Populate audio input devices with individual channel options
 async function populateInputDevices() {
   try {
     // Request permission first to get device labels
@@ -819,11 +819,30 @@ async function populateInputDevices() {
     const audioInputs = devices.filter(device => device.kind === 'audioinput');
 
     inputSelect.innerHTML = '<option value="">Select Input Device</option>';
-    audioInputs.forEach(device => {
-      const option = document.createElement('option');
-      option.value = device.deviceId;
-      option.textContent = device.label || `Microphone ${inputSelect.options.length}`;
-      inputSelect.appendChild(option);
+    audioInputs.forEach((device, idx) => {
+      const label = device.label || `Microphone ${idx + 1}`;
+
+      // Check if this looks like a multi-channel interface (Scarlett, Focusrite, etc.)
+      const isInterface = /scarlett|focusrite|interface|audio|usb/i.test(label);
+
+      if (isInterface) {
+        // Add individual channel options for interfaces
+        const option1 = document.createElement('option');
+        option1.value = `${device.deviceId}:0`;
+        option1.textContent = `${label} - Input 1`;
+        inputSelect.appendChild(option1);
+
+        const option2 = document.createElement('option');
+        option2.value = `${device.deviceId}:1`;
+        option2.textContent = `${label} - Input 2`;
+        inputSelect.appendChild(option2);
+      } else {
+        // Single option for simple devices (built-in mic, etc.)
+        const option = document.createElement('option');
+        option.value = `${device.deviceId}:mono`;
+        option.textContent = label;
+        inputSelect.appendChild(option);
+      }
     });
 
     inputSelect.disabled = false;
@@ -834,8 +853,29 @@ async function populateInputDevices() {
 }
 
 // Create the audio processing chain
-function createAudioChain(ctx, source) {
+function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes = {};
+
+  // === INPUT CHANNEL SELECTION ===
+  // For multi-channel interfaces, select the specific input channel
+  audioNodes.inputSplitter = ctx.createChannelSplitter(2);
+  audioNodes.inputGain = ctx.createGain();
+
+  source.connect(audioNodes.inputSplitter);
+
+  if (channel === 0) {
+    // Left channel (Input 1)
+    audioNodes.inputSplitter.connect(audioNodes.inputGain, 0);
+    console.log('Using input channel: Left (Input 1)');
+  } else if (channel === 1) {
+    // Right channel (Input 2)
+    audioNodes.inputSplitter.connect(audioNodes.inputGain, 1);
+    console.log('Using input channel: Right (Input 2)');
+  } else {
+    // Mono - connect source directly (default behavior)
+    source.connect(audioNodes.inputGain);
+    console.log('Using input channel: Mono');
+  }
 
   // === COMPRESSOR 1 ===
   audioNodes.comp1Input = ctx.createGain();
@@ -857,8 +897,8 @@ function createAudioChain(ctx, source) {
   audioNodes.comp1Dry.gain.value = 0;
   audioNodes.comp1Bypass.gain.value = 1;
 
-  // Connect: input -> [compressor -> wetGain] + [dryGain] + [bypass] -> output
-  source.connect(audioNodes.comp1Input);
+  // Connect: inputGain -> comp1Input -> [compressor -> wetGain] + [dryGain] + [bypass] -> output
+  audioNodes.inputGain.connect(audioNodes.comp1Input);
   audioNodes.comp1Input.connect(audioNodes.comp1Compressor);
   audioNodes.comp1Compressor.connect(audioNodes.comp1Gain);
   audioNodes.comp1Gain.connect(audioNodes.comp1Output);
@@ -1044,7 +1084,11 @@ async function startAudio() {
   try {
     state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-    const deviceId = inputSelect.value || undefined;
+    // Parse device:channel format from selector
+    const selectedValue = inputSelect.value || '';
+    const [deviceId, channelStr] = selectedValue.split(':');
+    const channel = channelStr === 'mono' ? 'mono' : parseInt(channelStr, 10);
+
     const constraints = {
       audio: {
         deviceId: deviceId ? { exact: deviceId } : undefined,
@@ -1057,7 +1101,7 @@ async function startAudio() {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     const source = state.audioContext.createMediaStreamSource(stream);
 
-    createAudioChain(state.audioContext, source);
+    createAudioChain(state.audioContext, source, channel);
 
     state.audioStarted = true;
     startButton.textContent = 'Stop Audio';
