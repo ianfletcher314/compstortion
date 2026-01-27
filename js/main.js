@@ -38,8 +38,8 @@ const state = {
   distortion: { active: false, drive: 0.5, tone: 0.5, level: 0.5, type: 0 },
   comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
   amp: { active: true, bass: 0.5, mid: 0.5, treble: 0.5, gain: 0.3, type: 0 },
-  modulation: { active: false, rate: 0.4, depth: 0.5, mix: 0.5, type: 0 },
-  reverb: { active: false, decay: 0.5, mix: 0.3, tone: 0.5, type: 0 },
+  modulation: { active: false, rate: 0.4, depth: 0.5, blend: 0.5, type: 0 },
+  reverb: { active: false, decay: 0.5, blend: 0.3, tone: 0.5, type: 0 },
   audioStarted: false,
   audioContext: null,
 };
@@ -850,7 +850,7 @@ function updateAudioParams(pedal, param) {
       case 'depth':
         updateModDepth();
         break;
-      case 'mix':
+      case 'blend':
         if (state.modulation.active) {
           audioNodes.modWetGain.gain.value = value;
           audioNodes.modDryGain.gain.value = 1 - value;
@@ -865,7 +865,7 @@ function updateAudioParams(pedal, param) {
       case 'decay':
         updateReverbIR();
         break;
-      case 'mix':
+      case 'blend':
         if (state.reverb.active) {
           audioNodes.reverbWetGain.gain.value = value;
           audioNodes.reverbDryGain.gain.value = 1 - value;
@@ -1015,9 +1015,9 @@ function updateBypass(pedalId) {
   } else if (pedalId === 'modulation') {
     if (isActive) {
       audioNodes.modBypass.gain.value = 0;
-      audioNodes.modWetGain.gain.value = state.modulation.mix;
-      audioNodes.modDryGain.gain.value = 1 - state.modulation.mix;
-      console.log(`modulation ON: bypass=0, mix=${state.modulation.mix}`);
+      audioNodes.modWetGain.gain.value = state.modulation.blend;
+      audioNodes.modDryGain.gain.value = 1 - state.modulation.blend;
+      console.log(`modulation ON: bypass=0, blend=${state.modulation.blend}`);
     } else {
       audioNodes.modBypass.gain.value = 1;
       audioNodes.modWetGain.gain.value = 0;
@@ -1027,9 +1027,9 @@ function updateBypass(pedalId) {
   } else if (pedalId === 'reverb') {
     if (isActive) {
       audioNodes.reverbBypass.gain.value = 0;
-      audioNodes.reverbWetGain.gain.value = state.reverb.mix;
-      audioNodes.reverbDryGain.gain.value = 1 - state.reverb.mix;
-      console.log(`reverb ON: bypass=0, mix=${state.reverb.mix}`);
+      audioNodes.reverbWetGain.gain.value = state.reverb.blend;
+      audioNodes.reverbDryGain.gain.value = 1 - state.reverb.blend;
+      console.log(`reverb ON: bypass=0, blend=${state.reverb.blend}`);
     } else {
       audioNodes.reverbBypass.gain.value = 1;
       audioNodes.reverbWetGain.gain.value = 0;
