@@ -32,7 +32,6 @@ let audioNodes = null;
 // DOM Elements
 const startButton = document.getElementById('start-audio');
 const inputSelect = document.getElementById('input-select');
-const channelSelect = document.getElementById('channel-select');
 
 // Knob dragging state
 let activeKnob = null;
@@ -838,30 +837,6 @@ async function populateInputDevices() {
 function createAudioChain(ctx, source) {
   audioNodes = {};
 
-  // === INPUT CHANNEL SELECTION ===
-  // Split stereo input and select desired channel(s)
-  const channelMode = channelSelect ? channelSelect.value : 'mono';
-  audioNodes.inputSplitter = ctx.createChannelSplitter(2);
-  audioNodes.inputMerger = ctx.createChannelMerger(1); // Merge to mono
-  audioNodes.inputGain = ctx.createGain();
-
-  source.connect(audioNodes.inputSplitter);
-
-  if (channelMode === 'left') {
-    // Use only left channel
-    audioNodes.inputSplitter.connect(audioNodes.inputMerger, 0, 0);
-  } else if (channelMode === 'right') {
-    // Use only right channel
-    audioNodes.inputSplitter.connect(audioNodes.inputMerger, 1, 0);
-  } else {
-    // Mono mix - sum both channels
-    audioNodes.inputSplitter.connect(audioNodes.inputMerger, 0, 0);
-    audioNodes.inputSplitter.connect(audioNodes.inputMerger, 1, 0);
-    audioNodes.inputGain.gain.value = 0.5; // Reduce gain to prevent clipping when summing
-  }
-
-  audioNodes.inputMerger.connect(audioNodes.inputGain);
-
   // === COMPRESSOR 1 ===
   audioNodes.comp1Input = ctx.createGain();
   audioNodes.comp1Compressor = ctx.createDynamicsCompressor();
@@ -882,8 +857,8 @@ function createAudioChain(ctx, source) {
   audioNodes.comp1Dry.gain.value = 0;
   audioNodes.comp1Bypass.gain.value = 1;
 
-  // Connect: inputGain -> comp1Input -> [compressor -> wetGain] + [dryGain] + [bypass] -> output
-  audioNodes.inputGain.connect(audioNodes.comp1Input);
+  // Connect: input -> [compressor -> wetGain] + [dryGain] + [bypass] -> output
+  source.connect(audioNodes.comp1Input);
   audioNodes.comp1Input.connect(audioNodes.comp1Compressor);
   audioNodes.comp1Compressor.connect(audioNodes.comp1Gain);
   audioNodes.comp1Gain.connect(audioNodes.comp1Output);
