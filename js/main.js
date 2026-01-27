@@ -1,7 +1,16 @@
+// Distortion types based on famous pedals
+const DISTORTION_TYPES = [
+  { id: 'ts9', name: 'TS9', description: 'Tube Screamer - mid-focused overdrive' },
+  { id: 'rat', name: 'RAT', description: 'ProCo RAT - aggressive hard clipping' },
+  { id: 'blues', name: 'BLUES', description: 'Blues Breaker - transparent overdrive' },
+  { id: 'fuzz', name: 'FUZZ', description: 'Fuzz Face - vintage germanium fuzz' },
+  { id: 'muff', name: 'MUFF', description: 'Big Muff - sustaining fuzz' },
+];
+
 // Pedal state
 const state = {
   comp1: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5 },
-  distortion: { active: false, drive: 0.5, tone: 0.5, level: 0.5 },
+  distortion: { active: false, drive: 0.5, tone: 0.5, level: 0.5, type: 0 },
   comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5 },
   audioStarted: false,
   audioContext: null,
@@ -50,23 +59,154 @@ function mapDrive(value) {
   return 1 + (value * 19);
 }
 
-function mapTone(value) {
-  // 0-1 -> 500Hz to 8000Hz
-  return 500 + (value * 7500);
+function mapTone(value, typeIndex = 0) {
+  const type = DISTORTION_TYPES[typeIndex]?.id || 'ts9';
+
+  // Different pedals have different tone stack characteristics
+  switch (type) {
+    case 'ts9':
+      // TS9: Mid-focused, narrower range, doesn't get too dark
+      return 800 + (value * 6000);
+    case 'rat':
+      // RAT: Wide range filter, can get very dark
+      return 200 + (value * 8000);
+    case 'blues':
+      // Blues Breaker: Stays bright and open
+      return 1000 + (value * 7000);
+    case 'fuzz':
+      // Fuzz Face: Can get muffled, vintage range
+      return 400 + (value * 5000);
+    case 'muff':
+      // Big Muff: Scooped mids, extreme range
+      return 300 + (value * 9000);
+    default:
+      return 500 + (value * 7500);
+  }
 }
 
-// Create distortion curve for waveshaper
-function makeDistortionCurve(amount) {
+// Update tone filter Q and characteristics based on pedal type
+function updateToneFilterForType(typeIndex) {
+  if (!audioNodes || !audioNodes.distToneFilter) return;
+
+  const type = DISTORTION_TYPES[typeIndex]?.id || 'ts9';
+
+  switch (type) {
+    case 'ts9':
+      // TS9: Mid-hump, higher Q
+      audioNodes.distToneFilter.Q.value = 1.2;
+      break;
+    case 'rat':
+      // RAT: Flat response
+      audioNodes.distToneFilter.Q.value = 0.5;
+      break;
+    case 'blues':
+      // Blues Breaker: Open, transparent
+      audioNodes.distToneFilter.Q.value = 0.4;
+      break;
+    case 'fuzz':
+      // Fuzz Face: Slightly resonant
+      audioNodes.distToneFilter.Q.value = 0.8;
+      break;
+    case 'muff':
+      // Big Muff: Resonant peak
+      audioNodes.distToneFilter.Q.value = 1.5;
+      break;
+    default:
+      audioNodes.distToneFilter.Q.value = 0.7;
+  }
+
+  // Update the frequency based on current tone setting and new type
+  audioNodes.distToneFilter.frequency.value = mapTone(state.distortion.tone, typeIndex);
+}
+
+// Create distortion curve for waveshaper based on type
+function makeDistortionCurve(amount, typeIndex) {
   const samples = 44100;
   const curve = new Float32Array(samples);
-  const k = amount * 50;
+  const type = DISTORTION_TYPES[typeIndex].id;
 
   for (let i = 0; i < samples; i++) {
     const x = (i * 2) / samples - 1;
-    // Soft clipping curve
-    curve[i] = Math.tanh(k * x) / Math.tanh(k || 1);
+    curve[i] = applyDistortionAlgorithm(x, amount, type);
   }
+
+  // Normalize the curve to prevent clipping
+  let maxVal = 0;
+  for (let i = 0; i < samples; i++) {
+    maxVal = Math.max(maxVal, Math.abs(curve[i]));
+  }
+  if (maxVal > 0) {
+    for (let i = 0; i < samples; i++) {
+      curve[i] /= maxVal;
+    }
+  }
+
   return curve;
+}
+
+// Different distortion algorithms
+function applyDistortionAlgorithm(x, amount, type) {
+  const k = amount * 50 + 1; // Ensure minimum gain
+
+  switch (type) {
+    case 'ts9':
+      // Tube Screamer: Asymmetric soft clipping with mid-hump
+      // Positive side clips earlier, warmer sound
+      if (x >= 0) {
+        return Math.tanh(k * 0.7 * x);
+      } else {
+        return Math.tanh(k * x);
+      }
+
+    case 'rat':
+      // RAT: Hard clipping with sharp edges
+      // More aggressive, buzzier distortion
+      const ratGain = k * 1.5;
+      const ratSignal = ratGain * x;
+      if (ratSignal > 1) return 1;
+      if (ratSignal < -1) return -1;
+      // Slight soft knee near clipping threshold
+      if (ratSignal > 0.8) return 0.8 + 0.2 * Math.tanh((ratSignal - 0.8) * 5);
+      if (ratSignal < -0.8) return -0.8 + 0.2 * Math.tanh((ratSignal + 0.8) * 5);
+      return ratSignal;
+
+    case 'blues':
+      // Blues Breaker: Very soft, transparent overdrive
+      // Gentle compression, maintains dynamics
+      const bluesK = k * 0.5;
+      return (3 * bluesK * x) / (1 + 2 * Math.abs(bluesK * x));
+
+    case 'fuzz':
+      // Fuzz Face: Germanium-style asymmetric fuzz
+      // Gated feel on low signals, splatter on high
+      const fuzzGain = k * 2;
+      const fuzzSignal = fuzzGain * x;
+      // Asymmetric clipping with gate effect
+      if (Math.abs(fuzzSignal) < 0.1) {
+        return fuzzSignal * 0.5; // Gate effect on quiet signals
+      }
+      if (fuzzSignal >= 0) {
+        return Math.tanh(fuzzSignal * 1.5);
+      } else {
+        // Asymmetric - negative clips harder
+        return Math.max(-0.7, Math.tanh(fuzzSignal * 2));
+      }
+
+    case 'muff':
+      // Big Muff: Sustaining fuzz with squared-off waveform
+      // Creates that thick, wall-of-sound fuzz
+      const muffGain = k * 1.2;
+      const muffSignal = muffGain * x;
+      // Combination of soft and hard clipping for sustain
+      const soft = Math.tanh(muffSignal);
+      const hard = Math.max(-1, Math.min(1, muffSignal * 2));
+      // Blend based on drive amount
+      return soft * (1 - amount * 0.5) + hard * (amount * 0.5);
+
+    default:
+      // Fallback: standard soft clipping
+      return Math.tanh(k * x);
+  }
 }
 
 // Initialize knob rotations from state
@@ -86,6 +226,45 @@ function initKnobs() {
       console.warn(`Missing state for ${pedal}.${param}`);
     }
   });
+}
+
+// Update distortion type display
+function updateTypeDisplay() {
+  const typeDisplay = document.getElementById('distortion-type-display');
+  if (typeDisplay) {
+    const currentType = DISTORTION_TYPES[state.distortion.type];
+    typeDisplay.textContent = currentType.name;
+    typeDisplay.title = currentType.description;
+  }
+}
+
+// Cycle to next distortion type
+function cycleDistortionType(direction = 1) {
+  state.distortion.type = (state.distortion.type + direction + DISTORTION_TYPES.length) % DISTORTION_TYPES.length;
+  updateTypeDisplay();
+  updateAudioParams('distortion', 'type');
+  console.log(`Distortion type: ${DISTORTION_TYPES[state.distortion.type].name}`);
+}
+
+// Setup distortion type selector
+function setupTypeSelector() {
+  const typeSelector = document.getElementById('distortion-type-selector');
+  if (!typeSelector) return;
+
+  // Click cycles forward
+  typeSelector.addEventListener('click', (e) => {
+    e.preventDefault();
+    cycleDistortionType(1);
+  });
+
+  // Right-click cycles backward
+  typeSelector.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    cycleDistortionType(-1);
+  });
+
+  // Initialize display
+  updateTypeDisplay();
 }
 
 // Update knob visual rotation (value 0-1 maps to -135 to +135 degrees)
@@ -128,10 +307,14 @@ function updateAudioParams(pedal, param) {
     switch (param) {
       case 'drive':
         audioNodes.distPreGain.gain.value = mapDrive(value);
-        audioNodes.distWaveshaper.curve = makeDistortionCurve(value);
+        audioNodes.distWaveshaper.curve = makeDistortionCurve(value, state.distortion.type);
+        break;
+      case 'type':
+        audioNodes.distWaveshaper.curve = makeDistortionCurve(state.distortion.drive, value);
+        updateToneFilterForType(value);
         break;
       case 'tone':
-        audioNodes.distToneFilter.frequency.value = mapTone(value);
+        audioNodes.distToneFilter.frequency.value = mapTone(value, state.distortion.type);
         break;
       case 'level':
         if (state.distortion.active) {
@@ -305,12 +488,12 @@ function setupFootswitches() {
   });
 }
 
-// Keyboard shortcuts (1, 2, 3 for each pedal)
+// Keyboard shortcuts (1, 2, 3 for each pedal, D for distortion type)
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 
-    switch (e.key) {
+    switch (e.key.toLowerCase()) {
       case '1':
         togglePedal('comp1');
         animateFootswitch('comp1');
@@ -322,6 +505,10 @@ function setupKeyboardShortcuts() {
       case '3':
         togglePedal('comp2');
         animateFootswitch('comp2');
+        break;
+      case 'd':
+        // Cycle distortion type (shift+d for reverse)
+        cycleDistortionType(e.shiftKey ? -1 : 1);
         break;
     }
   });
@@ -398,11 +585,11 @@ function createAudioChain(ctx, source) {
 
   // Set distortion params
   audioNodes.distPreGain.gain.value = mapDrive(state.distortion.drive);
-  audioNodes.distWaveshaper.curve = makeDistortionCurve(state.distortion.drive);
+  audioNodes.distWaveshaper.curve = makeDistortionCurve(state.distortion.drive, state.distortion.type);
   audioNodes.distWaveshaper.oversample = '4x';
   audioNodes.distToneFilter.type = 'lowpass';
-  audioNodes.distToneFilter.frequency.value = mapTone(state.distortion.tone);
-  audioNodes.distToneFilter.Q.value = 0.7;
+  audioNodes.distToneFilter.frequency.value = mapTone(state.distortion.tone, state.distortion.type);
+  updateToneFilterForType(state.distortion.type);
 
   // Initial bypass state
   audioNodes.distPostGain.gain.value = 0;
@@ -506,6 +693,7 @@ function init() {
   setupKnobInteraction();
   setupFootswitches();
   setupKeyboardShortcuts();
+  setupTypeSelector();
   populateInputDevices();
 
   startButton.addEventListener('click', startAudio);
