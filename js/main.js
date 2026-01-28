@@ -47,6 +47,9 @@ const state = {
 // Audio node references
 let audioNodes = null;
 
+// Compressor meter animation
+let meterAnimationId = null;
+
 // DOM Elements
 const startButton = document.getElementById('start-audio');
 const inputSelect = document.getElementById('input-select');
@@ -1617,6 +1620,7 @@ function createAudioChain(ctx, source, channel = 'mono') {
 async function startAudio() {
   if (state.audioStarted) {
     // Stop audio
+    stopMeterAnimation();
     if (state.audioContext) {
       await state.audioContext.close();
       state.audioContext = null;
@@ -1655,11 +1659,68 @@ async function startAudio() {
     startButton.textContent = 'Stop Audio';
     startButton.classList.add('running');
 
+    // Start compressor meter animation
+    startMeterAnimation();
+
     console.log('Audio started! Sample rate:', state.audioContext.sampleRate);
   } catch (err) {
     console.error('Error starting audio:', err);
     alert('Could not start audio. Please check your input device and permissions.');
   }
+}
+
+// Compressor LED meter animation
+// Reads gain reduction from compressors and updates LED intensity
+function updateCompressorMeters() {
+  if (!audioNodes) {
+    meterAnimationId = null;
+    return;
+  }
+
+  // Comp1 LED
+  if (audioNodes.comp1Compressor && state.comp1.active) {
+    const led1 = document.getElementById('led-comp1');
+    if (led1) {
+      // reduction is negative dB (e.g., -6 means 6dB of gain reduction)
+      const reduction1 = audioNodes.comp1Compressor.reduction;
+      // Map -24dB to 0dB -> 1 to 0 intensity
+      const intensity1 = Math.min(1, Math.abs(reduction1) / 24);
+      led1.style.setProperty('--compression-intensity', intensity1.toFixed(3));
+    }
+  }
+
+  // Comp2 LED
+  if (audioNodes.comp2Compressor && state.comp2.active) {
+    const led2 = document.getElementById('led-comp2');
+    if (led2) {
+      const reduction2 = audioNodes.comp2Compressor.reduction;
+      const intensity2 = Math.min(1, Math.abs(reduction2) / 24);
+      led2.style.setProperty('--compression-intensity', intensity2.toFixed(3));
+    }
+  }
+
+  // Continue animation loop
+  meterAnimationId = requestAnimationFrame(updateCompressorMeters);
+}
+
+// Start the meter animation
+function startMeterAnimation() {
+  if (!meterAnimationId) {
+    meterAnimationId = requestAnimationFrame(updateCompressorMeters);
+  }
+}
+
+// Stop the meter animation
+function stopMeterAnimation() {
+  if (meterAnimationId) {
+    cancelAnimationFrame(meterAnimationId);
+    meterAnimationId = null;
+  }
+  // Reset LED intensities
+  const led1 = document.getElementById('led-comp1');
+  const led2 = document.getElementById('led-comp2');
+  if (led1) led1.style.setProperty('--compression-intensity', '0');
+  if (led2) led2.style.setProperty('--compression-intensity', '0');
 }
 
 // Initialize

@@ -386,6 +386,28 @@ body {
   border-color: var(--accent);
 }
 
+/* Compressor LED with variable intensity based on gain reduction */
+.led.compressor-led {
+  --compression-intensity: 0;
+  transition: none; /* Disable transition for real-time updates */
+}
+
+#comp1 .led.active.compressor-led {
+  filter: brightness(calc(1 + var(--compression-intensity) * 1.5));
+  box-shadow:
+    0 0 calc(8px + var(--compression-intensity) * 20px) var(--comp1-accent),
+    0 0 calc(16px + var(--compression-intensity) * 30px) var(--comp1-accent),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#comp2 .led.active.compressor-led {
+  filter: brightness(calc(1 + var(--compression-intensity) * 1.5));
+  box-shadow:
+    0 0 calc(8px + var(--compression-intensity) * 20px) var(--comp2-accent),
+    0 0 calc(16px + var(--compression-intensity) * 30px) var(--comp2-accent),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+}
+
 /* Type Selector (Distortion & Amp) */
 .type-selector {
   display: flex;
