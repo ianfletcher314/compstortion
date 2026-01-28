@@ -645,29 +645,61 @@ function updateAmpEQForType(typeIndex) {
   audioNodes.ampWaveshaper.curve = makeAmpCurve(gain, typeIndex);
 }
 
+// Ramp time constant for smooth parameter changes (prevents clicks)
+const RAMP_TIME = 0.02; // 20ms ramp
+
+// Helper to smoothly ramp a parameter
+function rampParam(param, value, ctx) {
+  param.setTargetAtTime(value, ctx.currentTime, RAMP_TIME);
+}
+
 // Update modulation depth based on type
 function updateModDepth() {
-  if (!audioNodes || !audioNodes.modLFOGain) return;
+  if (!audioNodes || !audioNodes.modLFOGain || !state.audioContext) return;
 
   const type = MOD_TYPES[state.modulation.type]?.id || 'phaser';
   const depth = state.modulation.depth;
+  const ctx = state.audioContext;
+
+  // First, mute all routing gains and modulation targets
+  rampParam(audioNodes.modPhaserIn.gain, 0, ctx);
+  rampParam(audioNodes.modFlangerIn.gain, 0, ctx);
+  rampParam(audioNodes.modVibratoIn.gain, 0, ctx);
+  rampParam(audioNodes.modTremoloIn.gain, 0, ctx);
+  rampParam(audioNodes.modLFOGain.gain, 0, ctx);
+  rampParam(audioNodes.modLFOGain2.gain, 0, ctx);
+  rampParam(audioNodes.modTremoloLFOGain.gain, 0, ctx);
 
   switch (type) {
     case 'phaser':
-      audioNodes.modLFOGain.gain.value = mapModDepth(depth, state.modulation.type);
+      // Enable phaser routing and modulate allpass filter frequencies
+      rampParam(audioNodes.modPhaserIn.gain, 1, ctx);
+      rampParam(audioNodes.modLFOGain.gain, depth * 1500, ctx); // 0-1500Hz sweep
       break;
+
     case 'flanger':
-      audioNodes.modLFOGain.gain.value = mapModDepth(depth, state.modulation.type);
+      // Enable flanger routing and modulate delay time
+      rampParam(audioNodes.modFlangerIn.gain, 1, ctx);
+      rampParam(audioNodes.modLFOGain.gain, depth * 0.004, ctx); // 0-4ms sweep
       break;
-    case 'leslie':
-      audioNodes.modLFOGain.gain.value = depth * 0.5;
-      if (audioNodes.modLFOGain2) audioNodes.modLFOGain2.gain.value = depth * 30;
-      break;
+
     case 'vibrato':
-      audioNodes.modLFOGain.gain.value = depth * 50;
+      // Enable vibrato routing and modulate delay time for pitch wobble
+      rampParam(audioNodes.modVibratoIn.gain, 1, ctx);
+      rampParam(audioNodes.modLFOGain.gain, depth * 0.003, ctx); // 0-3ms sweep
       break;
+
     case 'tremolo':
-      audioNodes.modLFOGain.gain.value = depth;
+      // Enable tremolo routing and modulate amplitude
+      rampParam(audioNodes.modTremoloIn.gain, 1, ctx);
+      rampParam(audioNodes.modTremoloLFOGain.gain, depth * 0.5, ctx);
+      break;
+
+    case 'leslie':
+      // Enable tremolo routing (reuses tremolo chain) with both LFOs
+      rampParam(audioNodes.modTremoloIn.gain, 1, ctx);
+      rampParam(audioNodes.modTremoloLFOGain.gain, depth * 0.3, ctx);
+      rampParam(audioNodes.modLFOGain2.gain, depth * 0.2, ctx);
       break;
   }
 }
@@ -677,19 +709,42 @@ function updateModulationType() {
   if (!audioNodes || !state.audioContext) return;
 
   const type = MOD_TYPES[state.modulation.type]?.id || 'phaser';
+  const ctx = state.audioContext;
 
-  // Update LFO frequency for new type
-  audioNodes.modLFO.frequency.value = mapModRate(state.modulation.rate, state.modulation.type);
+  // Update LFO frequency for new type (with ramp to avoid click)
+  const rate = mapModRate(state.modulation.rate, state.modulation.type);
+  rampParam(audioNodes.modLFO.frequency, rate, ctx);
+  rampParam(audioNodes.modLFO2.frequency, rate * 1.1, ctx);
 
-  // Update depth for new type
-  updateModDepth();
+  // Set LFO waveform based on effect type
+  // Triangle waves are smoother and reduce clicking
+  switch (type) {
+    case 'phaser':
+    case 'flanger':
+      audioNodes.modLFO.type = 'triangle';
+      break;
+    case 'vibrato':
+      audioNodes.modLFO.type = 'sine'; // Sine for natural vibrato
+      break;
+    case 'tremolo':
+      audioNodes.modLFO.type = 'sine'; // Sine for smooth tremolo
+      break;
+    case 'leslie':
+      audioNodes.modLFO.type = 'sine';
+      audioNodes.modLFO2.type = 'sine';
+      break;
+  }
 
-  // Update filter characteristics for phaser
-  if (type === 'phaser' && audioNodes.modAllpass) {
+  // Reset allpass filter base frequencies for phaser
+  if (audioNodes.modAllpass) {
+    const phaserFreqs = [200, 400, 800, 1600, 3200, 6400];
     for (let i = 0; i < audioNodes.modAllpass.length; i++) {
-      audioNodes.modAllpass[i].frequency.value = 1000 + (i * 500);
+      rampParam(audioNodes.modAllpass[i].frequency, phaserFreqs[i], ctx);
     }
   }
+
+  // Update depth for new type (this also mutes unused paths)
+  updateModDepth();
 
   console.log(`Modulation type updated to: ${type}`);
 }
@@ -843,17 +898,22 @@ function updateAudioParams(pedal, param) {
         break;
     }
   } else if (pedal === 'modulation' && audioNodes.modLFO) {
+    const ctx = state.audioContext;
     switch (param) {
       case 'rate':
-        audioNodes.modLFO.frequency.value = mapModRate(value, state.modulation.type);
+        rampParam(audioNodes.modLFO.frequency, mapModRate(value, state.modulation.type), ctx);
+        // Also update second LFO for Leslie effect
+        if (audioNodes.modLFO2) {
+          rampParam(audioNodes.modLFO2.frequency, mapModRate(value, state.modulation.type) * 1.1, ctx);
+        }
         break;
       case 'depth':
         updateModDepth();
         break;
       case 'blend':
         if (state.modulation.active) {
-          audioNodes.modWetGain.gain.value = value;
-          audioNodes.modDryGain.gain.value = 1 - value;
+          rampParam(audioNodes.modWetGain.gain, value, ctx);
+          rampParam(audioNodes.modDryGain.gain, 1 - value, ctx);
         }
         break;
       case 'type':
@@ -1013,15 +1073,18 @@ function updateBypass(pedalId) {
       console.log(`amp OFF: bypass=1`);
     }
   } else if (pedalId === 'modulation') {
+    const ctx = state.audioContext;
     if (isActive) {
-      audioNodes.modBypass.gain.value = 0;
-      audioNodes.modWetGain.gain.value = state.modulation.blend;
-      audioNodes.modDryGain.gain.value = 1 - state.modulation.blend;
+      // Enable the correct effect chain routing
+      updateModDepth();
+      rampParam(audioNodes.modBypass.gain, 0, ctx);
+      rampParam(audioNodes.modWetGain.gain, state.modulation.blend, ctx);
+      rampParam(audioNodes.modDryGain.gain, 1 - state.modulation.blend, ctx);
       console.log(`modulation ON: bypass=0, blend=${state.modulation.blend}`);
     } else {
-      audioNodes.modBypass.gain.value = 1;
-      audioNodes.modWetGain.gain.value = 0;
-      audioNodes.modDryGain.gain.value = 0;
+      rampParam(audioNodes.modBypass.gain, 1, ctx);
+      rampParam(audioNodes.modWetGain.gain, 0, ctx);
+      rampParam(audioNodes.modDryGain.gain, 0, ctx);
       console.log(`modulation OFF: bypass=1`);
     }
   } else if (pedalId === 'reverb') {
@@ -1360,47 +1423,77 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.modWetGain = ctx.createGain();
   audioNodes.modDryGain = ctx.createGain();
 
-  // LFO for modulation
+  // LFO for modulation (using triangle wave for smoother transitions)
   audioNodes.modLFO = ctx.createOscillator();
-  audioNodes.modLFO.type = 'sine';
+  audioNodes.modLFO.type = 'triangle';
   audioNodes.modLFO.frequency.value = mapModRate(state.modulation.rate, state.modulation.type);
   audioNodes.modLFOGain = ctx.createGain();
   audioNodes.modLFOGain.gain.value = 0;
 
-  // Allpass filters for phaser effect (4-stage)
-  audioNodes.modAllpass = [];
-  for (let i = 0; i < 4; i++) {
-    const allpass = ctx.createBiquadFilter();
-    allpass.type = 'allpass';
-    allpass.frequency.value = 1000 + (i * 500);
-    allpass.Q.value = 0.5;
-    audioNodes.modAllpass.push(allpass);
-  }
-
-  // Delay for flanger/chorus
-  audioNodes.modDelay = ctx.createDelay(0.05);
-  audioNodes.modDelay.delayTime.value = 0.005;
-
-  // Tremolo gain node
-  audioNodes.modTremoloGain = ctx.createGain();
-  audioNodes.modTremoloGain.gain.value = 1;
-
-  // Second LFO for leslie horn simulation
+  // Second LFO for leslie horn simulation (slightly detuned)
   audioNodes.modLFO2 = ctx.createOscillator();
-  audioNodes.modLFO2.type = 'sine';
+  audioNodes.modLFO2.type = 'triangle';
   audioNodes.modLFO2.frequency.value = mapModRate(state.modulation.rate, state.modulation.type) * 1.1;
   audioNodes.modLFOGain2 = ctx.createGain();
   audioNodes.modLFOGain2.gain.value = 0;
+
+  // === ROUTING GAIN NODES ===
+  // These control which effect chain receives signal (only one active at a time)
+  audioNodes.modPhaserIn = ctx.createGain();
+  audioNodes.modFlangerIn = ctx.createGain();
+  audioNodes.modVibratoIn = ctx.createGain();
+  audioNodes.modTremoloIn = ctx.createGain();
+
+  // Initialize all routing gains to 0 (will be set by updateModDepth)
+  audioNodes.modPhaserIn.gain.value = 0;
+  audioNodes.modFlangerIn.gain.value = 0;
+  audioNodes.modVibratoIn.gain.value = 0;
+  audioNodes.modTremoloIn.gain.value = 0;
+
+  // Allpass filters for phaser effect (6-stage for richer phasing)
+  audioNodes.modAllpass = [];
+  const phaserFreqs = [200, 400, 800, 1600, 3200, 6400];
+  for (let i = 0; i < 6; i++) {
+    const allpass = ctx.createBiquadFilter();
+    allpass.type = 'allpass';
+    allpass.frequency.value = phaserFreqs[i];
+    allpass.Q.value = 1.0;
+    audioNodes.modAllpass.push(allpass);
+  }
+
+  // Delay for flanger effect
+  audioNodes.modDelay = ctx.createDelay(0.05);
+  audioNodes.modDelay.delayTime.value = 0.007; // Base delay for flanger
+
+  // Separate vibrato delay - uses shorter base delay for pitch modulation
+  audioNodes.modVibratoDelay = ctx.createDelay(0.02);
+  audioNodes.modVibratoDelay.delayTime.value = 0.005; // 5ms center point
+
+  // Tremolo/Leslie amplitude modulation
+  audioNodes.modTremoloGain = ctx.createGain();
+  audioNodes.modTremoloGain.gain.value = 1;
+
+  // Tremolo LFO scaling (to modulate around 1.0, not 0.0)
+  audioNodes.modTremoloLFOGain = ctx.createGain();
+  audioNodes.modTremoloLFOGain.gain.value = 0;
 
   // Start LFOs
   audioNodes.modLFO.start();
   audioNodes.modLFO2.start();
 
-  // Connect LFO to modulation targets
+  // Connect LFOs through their gain controls
   audioNodes.modLFO.connect(audioNodes.modLFOGain);
+  audioNodes.modLFO2.connect(audioNodes.modLFOGain2);
 
-  // Phaser chain: input -> allpass filters -> wet
-  let lastNode = audioNodes.modInput;
+  // === CONNECT INPUT TO ALL ROUTING GAINS ===
+  audioNodes.modInput.connect(audioNodes.modPhaserIn);
+  audioNodes.modInput.connect(audioNodes.modFlangerIn);
+  audioNodes.modInput.connect(audioNodes.modVibratoIn);
+  audioNodes.modInput.connect(audioNodes.modTremoloIn);
+
+  // === PHASER CHAIN ===
+  // Routing -> allpass cascade -> wet output
+  let lastNode = audioNodes.modPhaserIn;
   for (const allpass of audioNodes.modAllpass) {
     lastNode.connect(allpass);
     audioNodes.modLFOGain.connect(allpass.frequency);
@@ -1408,14 +1501,27 @@ function createAudioChain(ctx, source, channel = 'mono') {
   }
   lastNode.connect(audioNodes.modWetGain);
 
-  // Also connect input through delay for flanger effect (LFO modulates delay time)
-  audioNodes.modInput.connect(audioNodes.modDelay);
+  // === FLANGER CHAIN ===
+  // Routing -> modulated delay -> wet output
+  audioNodes.modFlangerIn.connect(audioNodes.modDelay);
   audioNodes.modLFOGain.connect(audioNodes.modDelay.delayTime);
-  audioNodes.modDelay.connect(audioNodes.modTremoloGain);
+  audioNodes.modDelay.connect(audioNodes.modWetGain);
+
+  // === VIBRATO CHAIN ===
+  // Routing -> short modulated delay (100% wet) -> wet output
+  audioNodes.modVibratoIn.connect(audioNodes.modVibratoDelay);
+  audioNodes.modLFOGain.connect(audioNodes.modVibratoDelay.delayTime);
+  audioNodes.modVibratoDelay.connect(audioNodes.modWetGain);
+
+  // === TREMOLO/LESLIE CHAIN ===
+  // Routing -> amplitude modulated gain -> wet output
+  audioNodes.modLFO.connect(audioNodes.modTremoloLFOGain);
+  audioNodes.modTremoloLFOGain.connect(audioNodes.modTremoloGain.gain);
+  audioNodes.modTremoloIn.connect(audioNodes.modTremoloGain);
   audioNodes.modTremoloGain.connect(audioNodes.modWetGain);
 
-  // Tremolo: LFO modulates gain
-  audioNodes.modLFO.connect(audioNodes.modTremoloGain.gain);
+  // Leslie uses both LFOs for horn/drum simulation
+  audioNodes.modLFOGain2.connect(audioNodes.modTremoloGain.gain);
 
   // Dry path
   audioNodes.modInput.connect(audioNodes.modDryGain);
