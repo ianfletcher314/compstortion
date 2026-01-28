@@ -13,6 +13,20 @@
   --border-dark: #222;
   --border-medium: #333;
   --border-light: #444;
+
+  /* Earth Tones Pedal Colors */
+  --comp1-bg: #8b4513;
+  --comp1-accent: #d2691e;
+  --distortion-bg: #556b2f;
+  --distortion-accent: #9acd32;
+  --comp2-bg: #8b7355;
+  --comp2-accent: #d4a574;
+  --amp-bg: #4a5568;
+  --amp-accent: #a0aec0;
+  --mod-bg: #2c5545;
+  --mod-accent: #4fd1c5;
+  --reverb-bg: #5d3a3a;
+  --reverb-accent: #c88a8a;
 }
 
 * {
@@ -47,16 +61,13 @@ body {
 
 .title {
   text-align: center;
-  color: var(--accent);
+  color: #ffffff;
   font-size: 3rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 8px;
   margin-bottom: 30px;
-  text-shadow:
-    0 0 10px var(--accent-glow),
-    0 0 30px rgba(0, 204, 102, 0.3),
-    2px 2px 0 #000;
+  text-shadow: 2px 2px 0 #333;
   font-family: 'Oswald', 'Impact', sans-serif;
 }
 
@@ -175,16 +186,105 @@ body {
   border-radius: 4px;
 }
 
-/* All pedals use consistent dark grey with subtle green tint */
-#comp1,
-#distortion,
-#comp2,
-#amp,
-#modulation,
+/* Individual pedal colors - Earth Tones */
+#comp1 {
+  background: linear-gradient(180deg, var(--comp1-bg) 0%, color-mix(in srgb, var(--comp1-bg) 65%, black) 100%);
+  border-color: rgba(255,255,255,0.08);
+}
+#comp1 .led.active {
+  background: radial-gradient(circle at 30% 30%, #e8a060 0%, var(--comp1-accent) 50%, var(--comp1-bg) 100%);
+  box-shadow: 0 0 12px var(--comp1-accent);
+  border-color: var(--comp1-accent);
+}
+#comp1 .knob-indicator {
+  background: var(--comp1-accent);
+  box-shadow: 0 0 4px var(--comp1-accent);
+}
+
+#distortion {
+  background: linear-gradient(180deg, var(--distortion-bg) 0%, color-mix(in srgb, var(--distortion-bg) 65%, black) 100%);
+  border-color: rgba(255,255,255,0.08);
+}
+#distortion .led.active {
+  background: radial-gradient(circle at 30% 30%, #c5e17a 0%, var(--distortion-accent) 50%, var(--distortion-bg) 100%);
+  box-shadow: 0 0 12px var(--distortion-accent);
+  border-color: var(--distortion-accent);
+}
+#distortion .knob-indicator {
+  background: var(--distortion-accent);
+  box-shadow: 0 0 4px var(--distortion-accent);
+}
+#distortion .type-display {
+  color: var(--distortion-accent);
+  text-shadow: 0 0 8px rgba(154, 205, 50, 0.5);
+}
+
+#comp2 {
+  background: linear-gradient(180deg, var(--comp2-bg) 0%, color-mix(in srgb, var(--comp2-bg) 65%, black) 100%);
+  border-color: rgba(255,255,255,0.08);
+}
+#comp2 .led.active {
+  background: radial-gradient(circle at 30% 30%, #e8c9a8 0%, var(--comp2-accent) 50%, var(--comp2-bg) 100%);
+  box-shadow: 0 0 12px var(--comp2-accent);
+  border-color: var(--comp2-accent);
+}
+#comp2 .knob-indicator {
+  background: var(--comp2-accent);
+  box-shadow: 0 0 4px var(--comp2-accent);
+}
+
+#amp {
+  background: linear-gradient(180deg, var(--amp-bg) 0%, color-mix(in srgb, var(--amp-bg) 65%, black) 100%);
+  border-color: rgba(255,255,255,0.08);
+}
+#amp .led.active {
+  background: radial-gradient(circle at 30% 30%, #cbd5e0 0%, var(--amp-accent) 50%, var(--amp-bg) 100%);
+  box-shadow: 0 0 12px var(--amp-accent);
+  border-color: var(--amp-accent);
+}
+#amp .knob-indicator {
+  background: var(--amp-accent);
+  box-shadow: 0 0 4px var(--amp-accent);
+}
+#amp .type-display {
+  color: var(--amp-accent);
+  text-shadow: 0 0 8px rgba(160, 174, 192, 0.5);
+}
+
+#modulation {
+  background: linear-gradient(180deg, var(--mod-bg) 0%, color-mix(in srgb, var(--mod-bg) 65%, black) 100%);
+  border-color: rgba(255,255,255,0.08);
+}
+#modulation .led.active {
+  background: radial-gradient(circle at 30% 30%, #81e6d9 0%, var(--mod-accent) 50%, var(--mod-bg) 100%);
+  box-shadow: 0 0 12px var(--mod-accent);
+  border-color: var(--mod-accent);
+}
+#modulation .knob-indicator {
+  background: var(--mod-accent);
+  box-shadow: 0 0 4px var(--mod-accent);
+}
+#modulation .type-display {
+  color: var(--mod-accent);
+  text-shadow: 0 0 8px rgba(79, 209, 197, 0.5);
+}
+
 #reverb {
-  background:
-    linear-gradient(180deg, #1a1f1a 0%, #121512 50%, #0a0c0a 100%);
-  border-color: #1a2a1a;
+  background: linear-gradient(180deg, var(--reverb-bg) 0%, color-mix(in srgb, var(--reverb-bg) 65%, black) 100%);
+  border-color: rgba(255,255,255,0.08);
+}
+#reverb .led.active {
+  background: radial-gradient(circle at 30% 30%, #deb0b0 0%, var(--reverb-accent) 50%, var(--reverb-bg) 100%);
+  box-shadow: 0 0 12px var(--reverb-accent);
+  border-color: var(--reverb-accent);
+}
+#reverb .knob-indicator {
+  background: var(--reverb-accent);
+  box-shadow: 0 0 4px var(--reverb-accent);
+}
+#reverb .type-display {
+  color: var(--reverb-accent);
+  text-shadow: 0 0 8px rgba(200, 138, 138, 0.5);
 }
 
 /* Modulation pedal layout */
