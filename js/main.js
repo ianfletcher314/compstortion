@@ -1152,36 +1152,25 @@ function setupFootswitches() {
   });
 }
 
-// Keyboard shortcuts (1-6 for each pedal, D for distortion type, A for amp type, M for mod type, R for reverb type)
+// Keyboard shortcuts (1-6 for each pedal based on order, D for distortion type, A for amp type, M for mod type, R for reverb type)
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 
-    switch (e.key.toLowerCase()) {
-      case '1':
-        togglePedal('comp1');
-        animateFootswitch('comp1');
-        break;
-      case '2':
-        togglePedal('distortion');
-        animateFootswitch('distortion');
-        break;
-      case '3':
-        togglePedal('comp2');
-        animateFootswitch('comp2');
-        break;
-      case '4':
-        togglePedal('amp');
-        animateFootswitch('amp');
-        break;
-      case '5':
-        togglePedal('modulation');
-        animateFootswitch('modulation');
-        break;
-      case '6':
-        togglePedal('reverb');
-        animateFootswitch('reverb');
-        break;
+    const key = e.key.toLowerCase();
+
+    // Handle number keys 1-6 based on pedal order
+    if (key >= '1' && key <= '6') {
+      const index = parseInt(key, 10) - 1;
+      if (index < state.pedalOrder.length) {
+        const pedalId = state.pedalOrder[index];
+        togglePedal(pedalId);
+        animateFootswitch(pedalId);
+      }
+      return;
+    }
+
+    switch (key) {
       case 'd':
         // Cycle distortion type (shift+d for reverse)
         cycleDistortionType(e.shiftKey ? -1 : 1);
@@ -1883,6 +1872,22 @@ function updatePedalOrder() {
   const pedals = document.querySelectorAll('.pedal-board .pedal');
   state.pedalOrder = Array.from(pedals).map(p => p.id);
   console.log('Pedal order updated:', state.pedalOrder);
+
+  // Update footswitch labels to match new order
+  updateFootswitchLabels();
+}
+
+// Update footswitch labels based on current pedal order
+function updateFootswitchLabels() {
+  state.pedalOrder.forEach((pedalId, index) => {
+    const footswitch = document.querySelector(`.footswitch[data-pedal="${pedalId}"]`);
+    if (footswitch) {
+      const label = footswitch.querySelector('.footswitch-label');
+      if (label) {
+        label.textContent = index + 1;
+      }
+    }
+  });
 }
 
 // Enable/disable dragging based on audio state
@@ -1909,6 +1914,9 @@ function init() {
   setupReverbTypeSelector();
   setupDragAndDrop();
   populateInputDevices();
+
+  // Set initial footswitch labels based on pedal order
+  updateFootswitchLabels();
 
   startButton.addEventListener('click', startAudio);
 

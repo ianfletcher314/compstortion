@@ -514,6 +514,35 @@ body {
     0 0 8px var(--accent-glow);
 }
 
+/* Pedal-specific type selector hover colors */
+#distortion .type-selector:hover {
+  border-color: var(--distortion-accent);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.8),
+    0 0 8px rgba(154, 205, 50, 0.5);
+}
+
+#amp .type-selector:hover {
+  border-color: var(--amp-accent);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.8),
+    0 0 8px rgba(160, 174, 192, 0.5);
+}
+
+#modulation .type-selector:hover {
+  border-color: var(--mod-accent);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.8),
+    0 0 8px rgba(79, 209, 197, 0.5);
+}
+
+#reverb .type-selector:hover {
+  border-color: var(--reverb-accent);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.8),
+    0 0 8px rgba(200, 138, 138, 0.5);
+}
+
 .type-selector:active {
   background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-medium) 100%);
 }
