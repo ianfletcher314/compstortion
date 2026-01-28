@@ -40,6 +40,7 @@ const state = {
   amp: { active: true, bass: 0.5, mid: 0.5, midfreq: 0.5, treble: 0.5, gain: 0.3, master: 0.7, type: 0 },
   modulation: { active: false, rate: 0.4, depth: 0.5, blend: 0.5, type: 0 },
   reverb: { active: false, decay: 0.5, blend: 0.3, tone: 0.5, type: 0 },
+  pedalOrder: ['comp1', 'distortion', 'comp2', 'amp', 'modulation', 'reverb'],
   audioStarted: false,
   audioContext: null,
 };
@@ -1297,8 +1298,8 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.comp1Dry.gain.value = 0;
   audioNodes.comp1Bypass.gain.value = 1;
 
-  // Connect: inputGain -> comp1Input -> [compressor -> wetGain] + [dryGain] + [bypass] -> output
-  audioNodes.inputGain.connect(audioNodes.comp1Input);
+  // Internal comp1 connections (input to output within pedal)
+  // External connections are made later based on pedal order
   audioNodes.comp1Input.connect(audioNodes.comp1Compressor);
   audioNodes.comp1Compressor.connect(audioNodes.comp1Gain);
   audioNodes.comp1Gain.connect(audioNodes.comp1Output);
@@ -1328,8 +1329,7 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.distPostGain.gain.value = 0;
   audioNodes.distBypass.gain.value = 1;
 
-  // Connect
-  audioNodes.comp1Output.connect(audioNodes.distInput);
+  // Internal distortion connections
   audioNodes.distInput.connect(audioNodes.distPreGain);
   audioNodes.distPreGain.connect(audioNodes.distWaveshaper);
   audioNodes.distWaveshaper.connect(audioNodes.distToneFilter);
@@ -1358,8 +1358,7 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.comp2Dry.gain.value = 0;
   audioNodes.comp2Bypass.gain.value = 1;
 
-  // Connect: input -> [compressor -> wetGain] + [dryGain] + [bypass] -> output
-  audioNodes.distOutput.connect(audioNodes.comp2Input);
+  // Internal comp2 connections
   audioNodes.comp2Input.connect(audioNodes.comp2Compressor);
   audioNodes.comp2Compressor.connect(audioNodes.comp2Gain);
   audioNodes.comp2Gain.connect(audioNodes.comp2Output);
@@ -1423,8 +1422,7 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.ampPostGain.gain.value = mapAmpMaster(state.amp.master);
   audioNodes.ampBypass.gain.value = 0;
 
-  // Connect amp chain
-  audioNodes.comp2Output.connect(audioNodes.ampInput);
+  // Internal amp connections
   audioNodes.ampInput.connect(audioNodes.ampPreGain);
   audioNodes.ampPreGain.connect(audioNodes.ampWaveshaper);
   audioNodes.ampWaveshaper.connect(audioNodes.ampBassFilter);
@@ -1558,9 +1556,6 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.modDryGain.gain.value = 0;
   audioNodes.modBypass.gain.value = 1;
 
-  // Connect amp to modulation
-  audioNodes.ampOutput.connect(audioNodes.modInput);
-
   // === REVERB ===
   audioNodes.reverbInput = ctx.createGain();
   audioNodes.reverbOutput = ctx.createGain();
@@ -1601,23 +1596,22 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.reverbDryGain.gain.value = 0;
   audioNodes.reverbBypass.gain.value = 1;
 
-  // Connect modulation to reverb
-  audioNodes.modOutput.connect(audioNodes.reverbInput);
-
   // === STEREO OUTPUT (dual mono) ===
   // Use a channel splitter and merger to send mono signal to both L and R
   audioNodes.stereoSplitter = ctx.createChannelSplitter(2);
   audioNodes.stereoMerger = ctx.createChannelMerger(2);
 
-  // Connect reverb output to splitter, then merge channel 0 to both L and R
-  audioNodes.reverbOutput.connect(audioNodes.stereoSplitter);
+  // Stereo merger setup (pedal chain connects to splitter via connectPedalsInOrder)
   audioNodes.stereoSplitter.connect(audioNodes.stereoMerger, 0, 0); // Input ch 0 -> Output L
   audioNodes.stereoSplitter.connect(audioNodes.stereoMerger, 0, 1); // Input ch 0 -> Output R
 
   // Final output
   audioNodes.stereoMerger.connect(ctx.destination);
 
-  console.log('Audio chain created with amp, modulation, and reverb (stereo output)');
+  // Connect pedals in the configured order
+  connectPedalsInOrder();
+
+  console.log('Audio chain created with pedal order:', state.pedalOrder);
 
   // Apply current pedal states
   updateBypass('comp1');
@@ -1647,6 +1641,7 @@ async function startAudio() {
     state.audioStarted = false;
     startButton.textContent = 'Start Audio';
     startButton.classList.remove('running');
+    updateDraggableState();
     console.log('Audio stopped');
     return;
   }
@@ -1676,6 +1671,7 @@ async function startAudio() {
     state.audioStarted = true;
     startButton.textContent = 'Stop Audio';
     startButton.classList.add('running');
+    updateDraggableState();
 
     // Start compressor meter animation
     startMeterAnimation();
@@ -1780,6 +1776,127 @@ function stopMeterAnimation() {
   updateGRMeter('gr-meter-comp2', 0);
 }
 
+// Drag and drop state
+let draggedPedal = null;
+
+// Get pedal input/output nodes by pedal ID
+function getPedalIO(pedalId) {
+  const mapping = {
+    comp1: { input: audioNodes.comp1Input, output: audioNodes.comp1Output },
+    distortion: { input: audioNodes.distInput, output: audioNodes.distOutput },
+    comp2: { input: audioNodes.comp2Input, output: audioNodes.comp2Output },
+    amp: { input: audioNodes.ampInput, output: audioNodes.ampOutput },
+    modulation: { input: audioNodes.modInput, output: audioNodes.modOutput },
+    reverb: { input: audioNodes.reverbInput, output: audioNodes.reverbOutput },
+  };
+  return mapping[pedalId];
+}
+
+// Connect pedals in order based on state.pedalOrder
+function connectPedalsInOrder() {
+  if (!audioNodes) return;
+
+  // Connect input to first pedal
+  const firstPedal = getPedalIO(state.pedalOrder[0]);
+  audioNodes.inputGain.connect(firstPedal.input);
+
+  // Connect each pedal to the next
+  for (let i = 0; i < state.pedalOrder.length - 1; i++) {
+    const currentPedal = getPedalIO(state.pedalOrder[i]);
+    const nextPedal = getPedalIO(state.pedalOrder[i + 1]);
+    currentPedal.output.connect(nextPedal.input);
+  }
+
+  // Connect last pedal to stereo output
+  const lastPedal = getPedalIO(state.pedalOrder[state.pedalOrder.length - 1]);
+  lastPedal.output.connect(audioNodes.stereoSplitter);
+
+  console.log('Pedals connected in order:', state.pedalOrder);
+}
+
+// Setup drag and drop for pedal reordering
+function setupDragAndDrop() {
+  const pedalBoard = document.querySelector('.pedal-board');
+  const pedals = document.querySelectorAll('.pedal');
+
+  pedals.forEach(pedal => {
+    pedal.setAttribute('draggable', 'true');
+
+    pedal.addEventListener('dragstart', (e) => {
+      if (state.audioStarted) {
+        e.preventDefault();
+        return;
+      }
+      draggedPedal = pedal;
+      pedal.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    pedal.addEventListener('dragend', () => {
+      pedal.classList.remove('dragging');
+      draggedPedal = null;
+      // Remove all drag-over states
+      pedals.forEach(p => p.classList.remove('drag-over'));
+    });
+
+    pedal.addEventListener('dragover', (e) => {
+      if (state.audioStarted || !draggedPedal || draggedPedal === pedal) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      pedal.classList.add('drag-over');
+    });
+
+    pedal.addEventListener('dragleave', () => {
+      pedal.classList.remove('drag-over');
+    });
+
+    pedal.addEventListener('drop', (e) => {
+      e.preventDefault();
+      pedal.classList.remove('drag-over');
+
+      if (state.audioStarted || !draggedPedal || draggedPedal === pedal) return;
+
+      // Get pedal IDs
+      const draggedId = draggedPedal.id;
+      const targetId = pedal.id;
+
+      // Update DOM order
+      const rect = pedal.getBoundingClientRect();
+      const midpoint = rect.left + rect.width / 2;
+      if (e.clientX < midpoint) {
+        pedalBoard.insertBefore(draggedPedal, pedal);
+      } else {
+        pedalBoard.insertBefore(draggedPedal, pedal.nextSibling);
+      }
+
+      // Update state order
+      updatePedalOrder();
+    });
+  });
+
+  // Update draggable state based on audio
+  updateDraggableState();
+}
+
+// Update pedal order in state based on DOM order
+function updatePedalOrder() {
+  const pedals = document.querySelectorAll('.pedal-board .pedal');
+  state.pedalOrder = Array.from(pedals).map(p => p.id);
+  console.log('Pedal order updated:', state.pedalOrder);
+}
+
+// Enable/disable dragging based on audio state
+function updateDraggableState() {
+  const pedals = document.querySelectorAll('.pedal');
+  pedals.forEach(pedal => {
+    if (state.audioStarted) {
+      pedal.classList.add('no-drag');
+    } else {
+      pedal.classList.remove('no-drag');
+    }
+  });
+}
+
 // Initialize
 function init() {
   initKnobs();
@@ -1790,6 +1907,7 @@ function init() {
   setupAmpTypeSelector();
   setupModTypeSelector();
   setupReverbTypeSelector();
+  setupDragAndDrop();
   populateInputDevices();
 
   startButton.addEventListener('click', startAudio);
