@@ -882,6 +882,41 @@ body {
   cursor: default;
 }
 
+/* Drag hint animation */
+.pedal::after {
+  content: 'drag to reorder';
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: var(--text-medium);
+  font-size: 0.6rem;
+  padding: 4px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  font-family: 'Monoton', sans-serif;
+  letter-spacing: 1px;
+  z-index: 10;
+}
+
+.pedal:hover::after {
+  opacity: 1;
+  animation: dragHintPulse 2s ease-in-out infinite;
+}
+
+.pedal.no-drag::after {
+  display: none;
+}
+
+@keyframes dragHintPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .pedal-board {
