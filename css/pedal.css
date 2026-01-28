@@ -408,6 +408,87 @@ body {
     inset 0 -2px 4px rgba(0, 0, 0, 0.3);
 }
 
+/* Gain Reduction Meter - Distressor style */
+.gr-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gr-label {
+  font-size: 0.5rem;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+  font-family: 'Oswald', sans-serif;
+}
+
+.gr-bars {
+  display: flex;
+  gap: 3px;
+  height: 12px;
+}
+
+.gr-bar {
+  width: 8px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  transition: background 0.05s ease, box-shadow 0.05s ease;
+}
+
+.gr-bar.active[data-db="20"],
+.gr-bar.active[data-db="15"] {
+  background: #ff4444;
+  box-shadow: 0 0 6px #ff4444;
+}
+
+.gr-bar.active[data-db="10"],
+.gr-bar.active[data-db="8"] {
+  background: #ffaa00;
+  box-shadow: 0 0 6px #ffaa00;
+}
+
+.gr-bar.active[data-db="6"],
+.gr-bar.active[data-db="4"] {
+  background: #ffdd00;
+  box-shadow: 0 0 6px #ffdd00;
+}
+
+.gr-bar.active[data-db="2"],
+.gr-bar.active[data-db="1"] {
+  background: #44ff44;
+  box-shadow: 0 0 6px #44ff44;
+}
+
+.gr-scale {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 2px;
+  font-size: 0.4rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-family: 'Oswald', sans-serif;
+}
+
+/* Match pedal accent colors for active bars */
+#comp1 .gr-bar.active[data-db="1"],
+#comp1 .gr-bar.active[data-db="2"] {
+  background: var(--comp1-accent);
+  box-shadow: 0 0 6px var(--comp1-accent);
+}
+
+#comp2 .gr-bar.active[data-db="1"],
+#comp2 .gr-bar.active[data-db="2"] {
+  background: var(--comp2-accent);
+  box-shadow: 0 0 6px var(--comp2-accent);
+}
+
 /* Type Selector (Distortion & Amp) */
 .type-selector {
   display: flex;

@@ -1669,34 +1669,69 @@ async function startAudio() {
   }
 }
 
+// Gain reduction thresholds for each LED bar (in dB)
+const GR_THRESHOLDS = [20, 15, 10, 8, 6, 4, 2, 1];
+
+// Update the bar meter based on gain reduction
+function updateGRMeter(meterId, reductionDb) {
+  const meter = document.getElementById(meterId);
+  if (!meter) return;
+
+  const bars = meter.querySelectorAll('.gr-bar');
+  const absReduction = Math.abs(reductionDb);
+
+  bars.forEach(bar => {
+    const threshold = parseInt(bar.dataset.db, 10);
+    if (absReduction >= threshold) {
+      bar.classList.add('active');
+    } else {
+      bar.classList.remove('active');
+    }
+  });
+}
+
 // Compressor LED meter animation
-// Reads gain reduction from compressors and updates LED intensity
+// Reads gain reduction from compressors and updates LED intensity + bar meters
 function updateCompressorMeters() {
   if (!audioNodes) {
     meterAnimationId = null;
     return;
   }
 
-  // Comp1 LED
+  // Comp1
   if (audioNodes.comp1Compressor && state.comp1.active) {
+    const reduction1 = audioNodes.comp1Compressor.reduction;
+
+    // Update LED intensity
     const led1 = document.getElementById('led-comp1');
     if (led1) {
-      // reduction is negative dB (e.g., -6 means 6dB of gain reduction)
-      const reduction1 = audioNodes.comp1Compressor.reduction;
-      // Map -24dB to 0dB -> 1 to 0 intensity
       const intensity1 = Math.min(1, Math.abs(reduction1) / 24);
       led1.style.setProperty('--compression-intensity', intensity1.toFixed(3));
     }
+
+    // Update bar meter
+    updateGRMeter('gr-meter-comp1', reduction1);
+  } else {
+    // Clear meter when inactive
+    updateGRMeter('gr-meter-comp1', 0);
   }
 
-  // Comp2 LED
+  // Comp2
   if (audioNodes.comp2Compressor && state.comp2.active) {
+    const reduction2 = audioNodes.comp2Compressor.reduction;
+
+    // Update LED intensity
     const led2 = document.getElementById('led-comp2');
     if (led2) {
-      const reduction2 = audioNodes.comp2Compressor.reduction;
       const intensity2 = Math.min(1, Math.abs(reduction2) / 24);
       led2.style.setProperty('--compression-intensity', intensity2.toFixed(3));
     }
+
+    // Update bar meter
+    updateGRMeter('gr-meter-comp2', reduction2);
+  } else {
+    // Clear meter when inactive
+    updateGRMeter('gr-meter-comp2', 0);
   }
 
   // Continue animation loop
@@ -1721,6 +1756,10 @@ function stopMeterAnimation() {
   const led2 = document.getElementById('led-comp2');
   if (led1) led1.style.setProperty('--compression-intensity', '0');
   if (led2) led2.style.setProperty('--compression-intensity', '0');
+
+  // Clear bar meters
+  updateGRMeter('gr-meter-comp1', 0);
+  updateGRMeter('gr-meter-comp2', 0);
 }
 
 // Initialize
