@@ -40,7 +40,7 @@ const state = {
   amp: { active: true, bass: 0.5, mid: 0.5, midfreq: 0.5, treble: 0.5, gain: 0.3, master: 0.7, type: 0 },
   modulation: { active: false, rate: 0.4, depth: 0.5, blend: 0.5, type: 0 },
   reverb: { active: false, decay: 0.5, blend: 0.3, tone: 0.5, type: 0 },
-  pedalOrder: ['comp1', 'distortion', 'comp2', 'amp', 'modulation', 'reverb'],
+  pedalOrder: ['comp1', 'distortion', 'modulation', 'reverb', 'comp2', 'amp'],
   audioStarted: false,
   audioContext: null,
 };
