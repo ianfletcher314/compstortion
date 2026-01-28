@@ -37,7 +37,7 @@ const state = {
   comp1: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
   distortion: { active: false, drive: 0.5, tone: 0.5, level: 0.5, type: 0 },
   comp2: { active: false, threshold: 0.5, ratio: 0.5, attack: 0.3, release: 0.5, level: 0.5, blend: 1.0 },
-  amp: { active: true, bass: 0.5, mid: 0.5, treble: 0.5, gain: 0.3, type: 0 },
+  amp: { active: true, bass: 0.5, mid: 0.5, midfreq: 0.5, treble: 0.5, gain: 0.3, master: 0.7, type: 0 },
   modulation: { active: false, rate: 0.4, depth: 0.5, blend: 0.5, type: 0 },
   reverb: { active: false, decay: 0.5, blend: 0.3, tone: 0.5, type: 0 },
   audioStarted: false,
@@ -129,6 +129,16 @@ function mapAmpMid(value) {
 function mapAmpTreble(value) {
   // 0-1 -> -12 to +12 dB
   return (value - 0.5) * 24;
+}
+
+function mapAmpMidFreq(value) {
+  // 0-1 -> 200Hz to 2000Hz (logarithmic)
+  return 200 * Math.pow(10, value);
+}
+
+function mapAmpMaster(value) {
+  // 0-1 -> 0 to 1.5 (with 0.7 being default)
+  return value * 1.5;
 }
 
 function mapAmpGain(value, typeIndex = 0) {
@@ -888,6 +898,9 @@ function updateAudioParams(pedal, param) {
       case 'mid':
         audioNodes.ampMidFilter.gain.value = mapAmpMid(value);
         break;
+      case 'midfreq':
+        audioNodes.ampMidFilter.frequency.value = mapAmpMidFreq(value);
+        break;
       case 'treble':
         audioNodes.ampTrebleFilter.gain.value = mapAmpTreble(value);
         break;
@@ -895,6 +908,11 @@ function updateAudioParams(pedal, param) {
         const gain = mapAmpGain(value, state.amp.type);
         audioNodes.ampPreGain.gain.value = gain;
         audioNodes.ampWaveshaper.curve = makeAmpCurve(gain, state.amp.type);
+        break;
+      case 'master':
+        if (state.amp.active) {
+          audioNodes.ampPostGain.gain.value = mapAmpMaster(value);
+        }
         break;
       case 'type':
         updateAmpEQForType(value);
@@ -1068,8 +1086,8 @@ function updateBypass(pedalId) {
   } else if (pedalId === 'amp') {
     if (isActive) {
       audioNodes.ampBypass.gain.value = 0;
-      audioNodes.ampPostGain.gain.value = 0.7; // Master output level
-      console.log(`amp ON: bypass=0`);
+      audioNodes.ampPostGain.gain.value = mapAmpMaster(state.amp.master);
+      console.log(`amp ON: bypass=0, master=${mapAmpMaster(state.amp.master)}`);
     } else {
       audioNodes.ampBypass.gain.value = 1;
       audioNodes.ampPostGain.gain.value = 0;
@@ -1382,7 +1400,7 @@ function createAudioChain(ctx, source, channel = 'mono') {
 
   // Mid EQ (peaking)
   audioNodes.ampMidFilter.type = 'peaking';
-  audioNodes.ampMidFilter.frequency.value = 800;
+  audioNodes.ampMidFilter.frequency.value = mapAmpMidFreq(state.amp.midfreq);
   audioNodes.ampMidFilter.Q.value = 1.0;
   audioNodes.ampMidFilter.gain.value = mapAmpMid(state.amp.mid);
 
@@ -1402,7 +1420,7 @@ function createAudioChain(ctx, source, channel = 'mono') {
   audioNodes.ampHighpassFilter.Q.value = 0.7;
 
   // Initial state - amp ON by default
-  audioNodes.ampPostGain.gain.value = 0.7;
+  audioNodes.ampPostGain.gain.value = mapAmpMaster(state.amp.master);
   audioNodes.ampBypass.gain.value = 0;
 
   // Connect amp chain

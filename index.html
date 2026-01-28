@@ -262,7 +262,7 @@
           <div class="screw"></div>
         </div>
 
-        <h2 class="pedal-name">Amp Sim</h2>
+        <h2 class="pedal-name">Amp</h2>
 
         <div class="led-container">
           <div class="led" id="led-amp"></div>
@@ -274,7 +274,15 @@
           <span class="type-arrows">&#8592; &#8594;</span>
         </div>
 
-        <div class="knobs knobs-4">
+        <div class="knobs knobs-6">
+          <div class="knob-group">
+            <div class="knob" data-param="gain" data-pedal="amp">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Gain</label>
+          </div>
           <div class="knob-group">
             <div class="knob" data-param="bass" data-pedal="amp">
               <div class="knob-inner">
@@ -292,6 +300,14 @@
             <label>Mid</label>
           </div>
           <div class="knob-group">
+            <div class="knob" data-param="midfreq" data-pedal="amp">
+              <div class="knob-inner">
+                <div class="knob-indicator"></div>
+              </div>
+            </div>
+            <label>Mid Freq</label>
+          </div>
+          <div class="knob-group">
             <div class="knob" data-param="treble" data-pedal="amp">
               <div class="knob-inner">
                 <div class="knob-indicator"></div>
@@ -300,12 +316,12 @@
             <label>Treble</label>
           </div>
           <div class="knob-group">
-            <div class="knob" data-param="gain" data-pedal="amp">
+            <div class="knob" data-param="master" data-pedal="amp">
               <div class="knob-inner">
                 <div class="knob-indicator"></div>
               </div>
             </div>
-            <label>Gain</label>
+            <label>Master</label>
           </div>
         </div>
 
