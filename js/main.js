@@ -1930,3 +1930,342 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ============================================================
+// SUPABASE AUTHENTICATION & PRESETS
+// ============================================================
+
+// Supabase configuration
+const SUPABASE_URL = 'https://yudfqtydezptwkbehrtx.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_dbbTU3T-Ppo1j5Nes3Zuwg_gB1BFo99';
+
+// Initialize Supabase client
+let supabase = null;
+let currentUser = null;
+
+function initSupabase() {
+  if (typeof window.supabase === 'undefined') {
+    console.warn('Supabase SDK not loaded. Presets feature disabled.');
+    return false;
+  }
+
+  if (SUPABASE_URL === 'YOUR_SUPABASE_PROJECT_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+    console.warn('Supabase not configured. Update SUPABASE_URL and SUPABASE_ANON_KEY in main.js');
+    return false;
+  }
+
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Listen for auth state changes
+  supabase.auth.onAuthStateChange((event, session) => {
+    console.log('Auth state changed:', event);
+    currentUser = session?.user || null;
+    updateAuthUI();
+    if (currentUser) {
+      loadUserPresets();
+    }
+  });
+
+  // Check initial auth state
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    currentUser = session?.user || null;
+    updateAuthUI();
+    if (currentUser) {
+      loadUserPresets();
+    }
+  });
+
+  setupAuthListeners();
+  setupPresetListeners();
+  return true;
+}
+
+// Update auth UI based on login state
+function updateAuthUI() {
+  const loggedOutContainer = document.getElementById('auth-logged-out');
+  const loggedInContainer = document.getElementById('auth-logged-in');
+  const authMessage = document.getElementById('auth-message');
+  const userEmailSpan = document.getElementById('user-email');
+  const presetSection = document.getElementById('preset-section');
+
+  if (currentUser) {
+    loggedOutContainer.style.display = 'none';
+    loggedInContainer.style.display = 'flex';
+    authMessage.style.display = 'none';
+    userEmailSpan.textContent = currentUser.email;
+    presetSection.style.display = 'flex';
+  } else {
+    loggedOutContainer.style.display = 'flex';
+    loggedInContainer.style.display = 'none';
+    userEmailSpan.textContent = '';
+    presetSection.style.display = 'none';
+    // Clear preset dropdown
+    const presetSelect = document.getElementById('preset-select');
+    presetSelect.innerHTML = '<option value="">Load Preset...</option>';
+  }
+}
+
+// Setup auth button listeners
+function setupAuthListeners() {
+  const loginBtn = document.getElementById('login-btn');
+  const loginEmail = document.getElementById('login-email');
+  const logoutBtn = document.getElementById('logout-btn');
+  const authMessage = document.getElementById('auth-message');
+
+  loginBtn.addEventListener('click', async () => {
+    const email = loginEmail.value.trim();
+    if (!email) {
+      alert('Please enter your email');
+      return;
+    }
+
+    try {
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Sending...';
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email,
+        options: {
+          emailRedirectTo: window.location.origin + window.location.pathname
+        }
+      });
+
+      if (error) throw error;
+
+      // Show success message
+      authMessage.textContent = 'Check your email for the login link!';
+      authMessage.style.display = 'block';
+      loginEmail.value = '';
+    } catch (err) {
+      console.error('Login error:', err);
+      alert('Login failed: ' + err.message);
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Send Login Link';
+    }
+  });
+
+  // Allow pressing Enter in email input
+  loginEmail.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      loginBtn.click();
+    }
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (err) {
+      console.error('Logout error:', err);
+      alert('Logout failed: ' + err.message);
+    }
+  });
+}
+
+// Setup preset button listeners
+function setupPresetListeners() {
+  const saveBtn = document.getElementById('save-preset-btn');
+  const deleteBtn = document.getElementById('delete-preset-btn');
+  const presetSelect = document.getElementById('preset-select');
+
+  saveBtn.addEventListener('click', savePreset);
+  deleteBtn.addEventListener('click', deletePreset);
+  presetSelect.addEventListener('change', loadPreset);
+}
+
+// Get current pedal state as preset data
+function getPresetData() {
+  return {
+    comp1: { ...state.comp1, active: state.comp1.active },
+    distortion: { ...state.distortion, active: state.distortion.active },
+    comp2: { ...state.comp2, active: state.comp2.active },
+    amp: { ...state.amp, active: state.amp.active },
+    modulation: { ...state.modulation, active: state.modulation.active },
+    reverb: { ...state.reverb, active: state.reverb.active },
+    pedalOrder: [...state.pedalOrder],
+  };
+}
+
+// Apply preset data to current state and update UI
+function applyPresetData(data) {
+  const pedals = ['comp1', 'distortion', 'comp2', 'amp', 'modulation', 'reverb'];
+
+  pedals.forEach(pedal => {
+    if (data[pedal]) {
+      // Copy all properties except 'active' first
+      Object.keys(data[pedal]).forEach(key => {
+        if (key !== 'active' && state[pedal][key] !== undefined) {
+          state[pedal][key] = data[pedal][key];
+        }
+      });
+
+      // Update knob visuals
+      const knobs = document.querySelectorAll(`.knob[data-pedal="${pedal}"]`);
+      knobs.forEach(knob => {
+        const param = knob.dataset.param;
+        if (state[pedal][param] !== undefined) {
+          updateKnobRotation(knob, state[pedal][param]);
+          updateAudioParams(pedal, param);
+        }
+      });
+
+      // Handle active state (toggle if different)
+      if (data[pedal].active !== undefined && state[pedal].active !== data[pedal].active) {
+        togglePedal(pedal);
+      }
+    }
+  });
+
+  // Apply pedal order if present
+  if (data.pedalOrder && Array.isArray(data.pedalOrder)) {
+    state.pedalOrder = [...data.pedalOrder];
+    // Reorder DOM elements
+    const pedalBoard = document.querySelector('.pedal-board');
+    data.pedalOrder.forEach(pedalId => {
+      const pedal = document.getElementById(pedalId);
+      if (pedal) {
+        pedalBoard.appendChild(pedal);
+      }
+    });
+    updateFootswitchLabels();
+  }
+
+  // Update type displays
+  updateTypeDisplay();
+  updateAmpTypeDisplay();
+  updateModTypeDisplay();
+  updateReverbTypeDisplay();
+
+  console.log('Preset applied');
+}
+
+// Save current state as a preset
+async function savePreset() {
+  if (!supabase || !currentUser) return;
+
+  const nameInput = document.getElementById('preset-name');
+  const name = nameInput.value.trim();
+
+  if (!name) {
+    alert('Please enter a preset name');
+    return;
+  }
+
+  try {
+    const presetData = getPresetData();
+
+    const { error } = await supabase
+      .from('presets')
+      .insert({
+        user_id: currentUser.id,
+        name: name,
+        settings: presetData
+      });
+
+    if (error) throw error;
+
+    console.log('Preset saved:', name);
+    nameInput.value = '';
+    await loadUserPresets();
+  } catch (err) {
+    console.error('Save preset error:', err);
+    alert('Failed to save preset: ' + err.message);
+  }
+}
+
+// Load a preset from the dropdown
+async function loadPreset() {
+  if (!supabase || !currentUser) return;
+
+  const presetSelect = document.getElementById('preset-select');
+  const presetId = presetSelect.value;
+
+  if (!presetId) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('presets')
+      .select('settings')
+      .eq('id', presetId)
+      .single();
+
+    if (error) throw error;
+
+    if (data && data.settings) {
+      applyPresetData(data.settings);
+      console.log('Preset loaded');
+    }
+  } catch (err) {
+    console.error('Load preset error:', err);
+    alert('Failed to load preset: ' + err.message);
+  }
+}
+
+// Delete the currently selected preset
+async function deletePreset() {
+  if (!supabase || !currentUser) return;
+
+  const presetSelect = document.getElementById('preset-select');
+  const presetId = presetSelect.value;
+
+  if (!presetId) {
+    alert('Please select a preset to delete');
+    return;
+  }
+
+  const presetName = presetSelect.options[presetSelect.selectedIndex].text;
+  if (!confirm(`Delete preset "${presetName}"?`)) return;
+
+  try {
+    const { error } = await supabase
+      .from('presets')
+      .delete()
+      .eq('id', presetId);
+
+    if (error) throw error;
+
+    console.log('Preset deleted:', presetName);
+    await loadUserPresets();
+  } catch (err) {
+    console.error('Delete preset error:', err);
+    alert('Failed to delete preset: ' + err.message);
+  }
+}
+
+// Load all presets for the current user
+async function loadUserPresets() {
+  if (!supabase || !currentUser) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('presets')
+      .select('id, name, created_at')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const presetSelect = document.getElementById('preset-select');
+    presetSelect.innerHTML = '<option value="">Load Preset...</option>';
+
+    if (data) {
+      data.forEach(preset => {
+        const option = document.createElement('option');
+        option.value = preset.id;
+        option.textContent = preset.name;
+        presetSelect.appendChild(option);
+      });
+    }
+
+    console.log(`Loaded ${data?.length || 0} presets`);
+  } catch (err) {
+    console.error('Load presets error:', err);
+  }
+}
+
+// Initialize Supabase after DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  // Small delay to ensure Supabase SDK is loaded
+  setTimeout(initSupabase, 100);
+});
