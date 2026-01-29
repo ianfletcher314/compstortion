@@ -1960,68 +1960,98 @@ function initSupabase() {
   supabase.auth.onAuthStateChange((event, session) => {
     console.log('Auth state changed:', event);
     currentUser = session?.user || null;
-    updateAuthUI();
+    updateDrawerUI();
     if (currentUser) {
       loadUserPresets();
+      // If logged in and welcome screen visible, hide it
+      const welcomeScreen = document.getElementById('welcome-screen');
+      if (welcomeScreen && welcomeScreen.style.display !== 'none') {
+        showMainApp();
+      }
     }
   });
 
   // Check initial auth state
   supabase.auth.getSession().then(({ data: { session } }) => {
     currentUser = session?.user || null;
-    updateAuthUI();
+    // If already logged in, skip welcome screen
     if (currentUser) {
+      showMainApp();
       loadUserPresets();
     }
+    updateDrawerUI();
   });
 
-  setupAuthListeners();
+  setupWelcomeListeners();
+  setupDrawerListeners();
   setupPresetListeners();
   return true;
 }
 
-// Update auth UI based on login state
-function updateAuthUI() {
-  const loggedOutContainer = document.getElementById('auth-logged-out');
-  const loggedInContainer = document.getElementById('auth-logged-in');
-  const authMessage = document.getElementById('auth-message');
-  const userEmailSpan = document.getElementById('user-email');
-  const presetSection = document.getElementById('preset-section');
+// Show main app and hide welcome screen
+function showMainApp() {
+  const welcomeScreen = document.getElementById('welcome-screen');
+  const mainApp = document.getElementById('main-app');
+  const settingsBtn = document.getElementById('settings-btn');
+
+  welcomeScreen.style.display = 'none';
+  mainApp.style.display = 'block';
+  settingsBtn.style.display = 'flex';
+}
+
+// Update drawer UI based on login state
+function updateDrawerUI() {
+  const drawerLoggedOut = document.getElementById('drawer-logged-out');
+  const drawerLoggedIn = document.getElementById('drawer-logged-in');
+  const drawerPresets = document.getElementById('drawer-presets');
+  const drawerUserEmail = document.getElementById('drawer-user-email');
 
   if (currentUser) {
-    loggedOutContainer.style.display = 'none';
-    loggedInContainer.style.display = 'flex';
-    authMessage.style.display = 'none';
-    userEmailSpan.textContent = currentUser.email;
-    presetSection.style.display = 'flex';
+    drawerLoggedOut.style.display = 'none';
+    drawerLoggedIn.style.display = 'block';
+    drawerPresets.style.display = 'block';
+    drawerUserEmail.textContent = currentUser.email;
   } else {
-    loggedOutContainer.style.display = 'flex';
-    loggedInContainer.style.display = 'none';
-    userEmailSpan.textContent = '';
-    presetSection.style.display = 'none';
+    drawerLoggedOut.style.display = 'block';
+    drawerLoggedIn.style.display = 'none';
+    drawerPresets.style.display = 'none';
+    drawerUserEmail.textContent = '';
     // Clear preset dropdown
     const presetSelect = document.getElementById('preset-select');
-    presetSelect.innerHTML = '<option value="">Load Preset...</option>';
+    if (presetSelect) {
+      presetSelect.innerHTML = '<option value="">Load a preset...</option>';
+    }
   }
 }
 
-// Setup auth button listeners
-function setupAuthListeners() {
-  const loginBtn = document.getElementById('login-btn');
-  const loginEmail = document.getElementById('login-email');
-  const logoutBtn = document.getElementById('logout-btn');
-  const authMessage = document.getElementById('auth-message');
+// Open/close drawer
+function openDrawer() {
+  document.getElementById('settings-drawer').classList.add('active');
+  document.getElementById('drawer-overlay').classList.add('active');
+}
 
-  loginBtn.addEventListener('click', async () => {
-    const email = loginEmail.value.trim();
+function closeDrawer() {
+  document.getElementById('settings-drawer').classList.remove('active');
+  document.getElementById('drawer-overlay').classList.remove('active');
+}
+
+// Setup welcome screen listeners
+function setupWelcomeListeners() {
+  const welcomeLoginBtn = document.getElementById('welcome-login-btn');
+  const welcomeGuestBtn = document.getElementById('welcome-guest-btn');
+  const welcomeEmail = document.getElementById('welcome-email');
+  const welcomeMessage = document.getElementById('welcome-message');
+
+  welcomeLoginBtn.addEventListener('click', async () => {
+    const email = welcomeEmail.value.trim();
     if (!email) {
       alert('Please enter your email');
       return;
     }
 
     try {
-      loginBtn.disabled = true;
-      loginBtn.textContent = 'Sending...';
+      welcomeLoginBtn.disabled = true;
+      welcomeLoginBtn.textContent = 'Sending...';
 
       const { error } = await supabase.auth.signInWithOtp({
         email: email,
@@ -2032,27 +2062,82 @@ function setupAuthListeners() {
 
       if (error) throw error;
 
-      // Show success message
-      authMessage.textContent = 'Check your email for the login link!';
-      authMessage.style.display = 'block';
-      loginEmail.value = '';
+      welcomeMessage.textContent = 'Check your email for the login link!';
+      welcomeMessage.style.display = 'block';
+      welcomeEmail.value = '';
     } catch (err) {
       console.error('Login error:', err);
       alert('Login failed: ' + err.message);
     } finally {
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'Send Login Link';
+      welcomeLoginBtn.disabled = false;
+      welcomeLoginBtn.textContent = 'Login to Save Presets';
     }
   });
 
-  // Allow pressing Enter in email input
-  loginEmail.addEventListener('keypress', (e) => {
+  welcomeEmail.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-      loginBtn.click();
+      welcomeLoginBtn.click();
     }
   });
 
-  logoutBtn.addEventListener('click', async () => {
+  welcomeGuestBtn.addEventListener('click', () => {
+    showMainApp();
+  });
+}
+
+// Setup drawer listeners
+function setupDrawerListeners() {
+  const settingsBtn = document.getElementById('settings-btn');
+  const drawerClose = document.getElementById('drawer-close');
+  const drawerOverlay = document.getElementById('drawer-overlay');
+  const drawerLoginBtn = document.getElementById('drawer-login-btn');
+  const drawerEmail = document.getElementById('drawer-email');
+  const drawerLogoutBtn = document.getElementById('drawer-logout-btn');
+  const drawerMessage = document.getElementById('drawer-message');
+
+  settingsBtn.addEventListener('click', openDrawer);
+  drawerClose.addEventListener('click', closeDrawer);
+  drawerOverlay.addEventListener('click', closeDrawer);
+
+  drawerLoginBtn.addEventListener('click', async () => {
+    const email = drawerEmail.value.trim();
+    if (!email) {
+      alert('Please enter your email');
+      return;
+    }
+
+    try {
+      drawerLoginBtn.disabled = true;
+      drawerLoginBtn.textContent = 'Sending...';
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email,
+        options: {
+          emailRedirectTo: window.location.origin + window.location.pathname
+        }
+      });
+
+      if (error) throw error;
+
+      drawerMessage.textContent = 'Check your email for the login link!';
+      drawerMessage.style.display = 'block';
+      drawerEmail.value = '';
+    } catch (err) {
+      console.error('Login error:', err);
+      alert('Login failed: ' + err.message);
+    } finally {
+      drawerLoginBtn.disabled = false;
+      drawerLoginBtn.textContent = 'Send Login Link';
+    }
+  });
+
+  drawerEmail.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      drawerLoginBtn.click();
+    }
+  });
+
+  drawerLogoutBtn.addEventListener('click', async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;

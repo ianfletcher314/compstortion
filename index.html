@@ -8,7 +8,68 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <div class="container">
+  <!-- Welcome Screen -->
+  <div id="welcome-screen" class="welcome-screen">
+    <div class="welcome-content">
+      <h1 class="welcome-title">Compstortion</h1>
+      <p class="welcome-subtitle">Web-based guitar effects pedalboard</p>
+      <div class="welcome-buttons">
+        <div class="welcome-login">
+          <input type="email" id="welcome-email" class="welcome-input" placeholder="Enter your email...">
+          <button id="welcome-login-btn" class="welcome-btn welcome-btn-primary">Login to Save Presets</button>
+        </div>
+        <div class="welcome-divider"><span>or</span></div>
+        <button id="welcome-guest-btn" class="welcome-btn welcome-btn-secondary">Continue as Guest</button>
+      </div>
+      <p id="welcome-message" class="welcome-message" style="display: none;"></p>
+    </div>
+  </div>
+
+  <!-- Settings Drawer -->
+  <div id="settings-drawer" class="settings-drawer">
+    <div class="drawer-header">
+      <h3>Settings</h3>
+      <button id="drawer-close" class="drawer-close">&times;</button>
+    </div>
+    <div class="drawer-content">
+      <div id="drawer-logged-out" class="drawer-section">
+        <h4>Account</h4>
+        <p class="drawer-text">Login to save and load your presets across devices.</p>
+        <input type="email" id="drawer-email" class="drawer-input" placeholder="Enter your email...">
+        <button id="drawer-login-btn" class="drawer-btn">Send Login Link</button>
+        <p id="drawer-message" class="drawer-message" style="display: none;"></p>
+      </div>
+      <div id="drawer-logged-in" class="drawer-section" style="display: none;">
+        <h4>Account</h4>
+        <p class="drawer-text">Logged in as <span id="drawer-user-email"></span></p>
+        <button id="drawer-logout-btn" class="drawer-btn drawer-btn-secondary">Logout</button>
+      </div>
+      <div id="drawer-presets" class="drawer-section" style="display: none;">
+        <h4>Presets</h4>
+        <div class="drawer-preset-save">
+          <input type="text" id="preset-name" class="drawer-input" placeholder="Preset name...">
+          <button id="save-preset-btn" class="drawer-btn">Save Current</button>
+        </div>
+        <div class="drawer-preset-load">
+          <select id="preset-select" class="drawer-select">
+            <option value="">Load a preset...</option>
+          </select>
+          <button id="delete-preset-btn" class="drawer-btn drawer-btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+
+  <!-- Settings Button -->
+  <button id="settings-btn" class="settings-btn" style="display: none;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
+
+  <div id="main-app" class="container" style="display: none;">
     <h1 class="title">Compstortion</h1>
 
     <div class="pedal-board">
@@ -460,27 +521,6 @@
       <select id="input-select" class="input-select" disabled>
         <option value="">Select Input Device</option>
       </select>
-    </div>
-
-    <div class="auth-section">
-      <div id="auth-logged-out" class="auth-container">
-        <input type="email" id="login-email" class="auth-input" placeholder="Enter your email...">
-        <button id="login-btn" class="auth-button">Send Login Link</button>
-      </div>
-      <div id="auth-message" class="auth-message" style="display: none;"></div>
-      <div id="auth-logged-in" class="auth-container" style="display: none;">
-        <span id="user-email" class="user-email"></span>
-        <button id="logout-btn" class="auth-button auth-button-secondary">Logout</button>
-      </div>
-    </div>
-
-    <div id="preset-section" class="preset-section" style="display: none;">
-      <input type="text" id="preset-name" class="preset-input" placeholder="Preset name...">
-      <button id="save-preset-btn" class="preset-button">Save</button>
-      <select id="preset-select" class="preset-select">
-        <option value="">Load Preset...</option>
-      </select>
-      <button id="delete-preset-btn" class="preset-button preset-button-danger">Delete</button>
     </div>
 
     <div class="instructions">
